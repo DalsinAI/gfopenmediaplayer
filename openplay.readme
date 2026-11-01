@@ -1,16 +1,16 @@
 Short:        Media player for every datatype
 Uploader:     (We fill this in at upload time)
-Author:       AmigaChrome Team
+Author:       AmiCradle Team
 Type:         mus/play
 Version:      0.1.1
 Architecture: m68k-amigaos >= 3.2.0
 Distribution: Aminet
 
-OpenPlay plays anything a datatype opens: pictures as a slideshow, sounds,
+GFOpenPlay plays anything a datatype opens: pictures as a slideshow, sounds,
 tunes and modules, and films, from one window with a playlist. A new
-datatype is a new format for OpenPlay, with nothing else to install.
+datatype is a new format for GFOpenPlay, with nothing else to install.
 
-It is drawn with OpenGadTools in your OpenLook theme, light or dark, with
+It is drawn with GFOpenGadTools in your GFOpenLook theme, light or dark, with
 its buttons as icons (the default), icons and text, or text. Files and
 drawers dropped on the window join the playlist; playlists save and open as
 .opl and .m3u.
@@ -23,12 +23,12 @@ AGA Amiga, Save CDXL turns a film into a CDXL the chipset plays by itself.
 Requires AmigaOS 3.2 and a 68040.
 
 New in 0.1.1 (10 October 2026): the window first opens at 800 x 600, in
-the middle of the space beside OpenDock (or all of that space on a smaller
-screen), and the buttons start as icons only, as in every Open app. A size
+the middle of the space beside GFOpenDock (or all of that space on a smaller
+screen), and the buttons start as icons only, as in every GFOpen app. A size
 you give the window is kept. View > Buttons still chooses icons and text,
 or text.
 
 Licence: MIT, Copyright (c) 2026 AmigaChrome Team. If you build on it, we ask
-that you credit the AmigaChrome Team.
+that you credit the AmiCradle Team.
 
 Source: https://github.com/DalsinAI/openamigamediaplayer

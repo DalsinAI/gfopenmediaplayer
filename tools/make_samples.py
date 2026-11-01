@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sample media for OpenPlay, all made here and all ours (MIT): a tune and a Boing ball.
+"""Sample media for GFOpenPlay, all made here and all ours (MIT): a tune and a Boing ball.
 
     python3 tools/make_samples.py OUT_DIR
 
@@ -107,7 +107,7 @@ BPM, SPEED = 125, 6                      # ProTracker's defaults: 6 ticks a row 
 # ---- ProTracker writer -------------------------------------------------------------------------------
 def write_mod(path):
     out = bytearray()
-    out += b"AmigaChrome Boing".ljust(20, b"\0")
+    out += b"AmiCradle Boing".ljust(20, b"\0")
     for i in range(31):
         if i < len(SAMPLES):
             name, data, loop, vol = SAMPLES[i]
@@ -282,7 +282,7 @@ def main():
     (tmp / "tune.raw").write_bytes(pcm)
     aud = ["-f", "s16le", "-ar", str(rate), "-ac", "2", "-i", str(tmp / "tune.raw")]
     subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", *aud, "-codec:a", "libmp3lame", "-b:a", "160k",
-                    "-metadata", "title=Boing", "-metadata", "artist=The AmigaChrome Team", str(out / "Boing.mp3")], check=True)
+                    "-metadata", "title=Boing", "-metadata", "artist=The AmiCradle Team", str(out / "Boing.mp3")], check=True)
     print("Boing.mp3: %.1f s" % seconds)
     # the film, 320 x 180 at 24 fps, as long as the tune
     frames_dir = tmp / "frames"; frames_dir.mkdir()
@@ -308,7 +308,7 @@ def main():
                         str(tmp / "cdxl_check.png")], capture_output=True, text=True)
     print("  decoded a frame:", "ok" if r.returncode == 0 else r.stderr.strip())
     (out / "README.txt").write_text(
-        "Sample media for OpenPlay, made by the AmigaChrome Team (MIT): a chiptune, Boing, and the Boing ball bouncing to it.\n"
+        "Sample media for GFOpenPlay, made by the AmigaChrome Team (MIT): a chiptune, Boing, and the Boing ball bouncing to it.\n"
         "  Boing.mod   ProTracker module, 4 channels\n  Boing.mp3   the tune rendered\n"
         "  Boing.mp4   the film, 320 x 180, H.264 + AAC\n  Boing.cdxl  the film for the chipset: CDXL 160 x 100, 32 colours, 12 fps\n"
         "Made by openamigamediaplayer/tools/make_samples.py.\n")

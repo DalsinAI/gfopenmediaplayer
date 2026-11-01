@@ -1,7 +1,7 @@
-/* OpenPlay: the Open media player (DESIGN.md). Plays anything a datatype
+/* GFOpenPlay: the Open media player (DESIGN.md). Plays anything a datatype
  * opens: pictures (a slideshow), sounds and tunes, animations and video,
  * through datatypes.library, so a new datatype is a new format for free.
- * Drawn with OpenGadTools in the OpenLook theme, by the rules of Open Apps
+ * Drawn with GFOpenGadTools in the GFOpenLook theme, by the rules of GFOpen Apps
  * Look and Feel: the buttons as icons (the default), icons and text, or
  * text; every action a menu item too; Workbench by default, its own screen
  * when asked.
@@ -13,7 +13,7 @@
  *   1:36 ======O----------------------- 4:12        [Add...][Remove][Save...]
  *   status: what opened it and how fast
  *
- *   OpenPlay [FILES ...] [BUTTONS=ICONS|TEXT|BOTH] [OWNSCREEN]
+ *   GFOpenPlay [FILES ...] [BUTTONS=ICONS|TEXT|BOTH] [OWNSCREEN]
  *
  * MIT, Copyright (c) 2026 AmigaChrome Team. */
 #include <exec/types.h>
@@ -72,19 +72,19 @@
 #include "op_icons.h"
 #include "op_rtg.h"
 
-#define VERSION_TEXT "OpenPlay 0.1.6 (12.10.2026)"
+#define VERSION_TEXT "GFOpenPlay 0.1.6 (12.10.2026)"
 static const char version[] __attribute__((used)) = "$VER: " VERSION_TEXT " MIT, Copyright (c) 2026 AmigaChrome Team";
 
 struct Library *DataTypesBase, *AslBase, *IFFParseBase, *IconBase, *WorkbenchBase;
 extern struct WBStartup *_WBenchMsg;
 
 #define THEME_DIR "SYS:Prefs/Presets/Themes/"
-#define PREFS_DIR "OpenPlay"
+#define PREFS_DIR "GFOpenPlay"
 #define MAX_ITEMS 512
 #define PATH_LEN 256
 #define SLIDE_TICKS 60                  /* six seconds a picture (IntuiTicks come ten a second) */
 
-/* The theme when none is set or found: OpenLook's Open, light. */
+/* The theme when none is set or found: GFOpenLook's Open, light. */
 static const char fallback_theme[] =
     "name Open\nversion 1\nfont \"DejaVu Sans\" 12\n[light]\n"
     "window #e8eaee\ntext #121825\nlabel #2a3342\nmuted #5d6676\n"
@@ -101,8 +101,8 @@ enum { C_OPEN = 1, C_PREV, C_PLAY, C_STOP, C_NEXT, C_REPEAT, C_FULL, C_LIST, C_I
        C_ADD, C_REMOVE, C_SAVELIST, C_CLEAR, C_ABOUT, C_QUIT, C_OWNSCREEN,
        C_BT_LOOK, C_BT_BOTH, C_BT_ICONS, C_BT_TEXT, C_FIT, C_ONE, C_FILL, C_SCOPE, C_OVERVIEW };
 
-/* The toolbar draws the buttons and their names; OpenPlay draws the
- * player icons on them (op_icons) until OpenGadTools has its own. */
+/* The toolbar draws the buttons and their names; GFOpenPlay draws the
+ * player icons on them (op_icons) until GFOpenGadTools has its own. */
 static ogt_tool tools[] = {
     { C_OPEN, "Open", OGT_ICON_NONE, 0, 0, 0 },
     { C_PREV, "Previous", OGT_ICON_NONE, 1, 0, 0 },
@@ -120,7 +120,7 @@ static int tool_icon[NTOOLS] = { OP_ICON_OPEN, OP_ICON_PREV, OP_ICON_PLAY, OP_IC
                                  OP_ICON_FULLSCREEN, OP_ICON_PLAYLIST, OP_ICON_INFO, OP_ICON_CONVERT };
 #define TB_PADX 6           /* ogt_toolbar's own spacing, to put the icons where it would */
 #define TB_PADY 3
-/* The key for each, shown in the help line: Open Apps Look and Feel, Keys. */
+/* The key for each, shown in the help line: GFOpen Apps Look and Feel, Keys. */
 static const char *const tool_keys[NTOOLS] = { "O", "V or Left", "P or Space", "T or Esc", "N or Right", "R", "F", "L", "I", "C" };
 
 static struct NewMenu newmenus[] = {
@@ -241,7 +241,7 @@ static LONG film_top;                       /* its first row on that screen (bel
 #define FILM_GAP 32                         /* rows above the film in its window (see open_film_screen) */
 static LONG film_frame = -1;                /* the frame last drawn into the window */
 static int film_again;                      /* draw once more on the next tick */
-static struct MsgPort *tick_port;           /* timer.device: OpenPlay looks for a new frame */
+static struct MsgPort *tick_port;           /* timer.device: GFOpenPlay looks for a new frame */
 static struct timerequest *tick_req;
 static int tick_out;
 static void film_present(void);
@@ -321,7 +321,7 @@ static char *load_text(const char *path)
     return buf;
 }
 
-/* ---- the look: ENV:OpenGadTools/Look, as OpenLook reads it ---- */
+/* ---- the look: ENV:GFOpenGadTools/Look, as GFOpenLook reads it ---- */
 
 static char *word(char **p, char *out, int size)
 {
@@ -340,7 +340,7 @@ static char *word(char **p, char *out, int size)
     return out;
 }
 
-static int on_amigachrome(void)
+static int on_amicradle(void)
 {
     struct Library *ExpansionBase = OpenLibrary((CONST_STRPTR)"expansion.library", 37);
     int ac = 0;
@@ -351,14 +351,14 @@ static int on_amigachrome(void)
     return ac;
 }
 
-/* Whether opengpu.library draws in hardware (opengadtools' ogt_gpu.h): an ARGB
+/* Whether gfopengpu.library draws in hardware (opengadtools' ogt_gpu.h): an ARGB
  * composite answered by a back end other than the CPU (back end 0). On a real
- * Amiga only the CPU back end runs, since ACRTG.gpu needs AmigaChrome's board. */
+ * Amiga only the CPU back end runs, since ACRTG.gpu needs AmiCradle's board. */
 #define OP_OGPU_Query(base, op, fmt) \
     LP2(0x1e, ULONG, OGPU_Query, ULONG, (op), d0, ULONG, (fmt), d1, , (base))
 static int gpu_in_hardware(void)
 {
-    struct Library *gpu = OpenLibrary((CONST_STRPTR)"opengpu.library", 0);
+    struct Library *gpu = OpenLibrary((CONST_STRPTR)"gfopengpu.library", 0);
     int hw = 0;
     if (gpu) {
         ULONG q = OP_OGPU_Query(gpu, 0x0020, 3);   /* OGPU_OP_COMPOSITE, OGPU_FMT_ARGB32 */
@@ -368,14 +368,14 @@ static int gpu_in_hardware(void)
     return hw;
 }
 
-/* Lite by itself: a real 68040 or 68060 whose drawing OpenGPU doesn't do in
- * hardware (OpenLook's rule; 12 Oct 2026: it asked only whether the library
- * opened, so OpenGPU on a real 68060 brought the shadows back on AGA). */
+/* Lite by itself: a real 68040 or 68060 whose drawing GFOpenGPU doesn't do in
+ * hardware (GFOpenLook's rule; 12 Oct 2026: it asked only whether the library
+ * opened, so GFOpenGPU on a real 68060 brought the shadows back on AGA). */
 static int lite_by_itself(void)
 {
     if (!(SysBase->AttnFlags & (AFF_68040 | AFF_68060))) return 0;
     if (gpu_in_hardware()) return 0;
-    return !on_amigachrome();
+    return !on_amicradle();
 }
 
 static int hour_now(void)
@@ -398,11 +398,11 @@ static int load_theme_file(const char *name)
     }
 }
 
-/* The theme, its mode, the accent and Lite, from OpenPrefs Look; else
- * ENV:OpenGadTools/Theme (OpenGadTools 0.1); else Open, light. */
+/* The theme, its mode, the accent and Lite, from GFOpenPrefs Look; else
+ * ENV:GFOpenGadTools/Theme (GFOpenGadTools 0.1); else Open, light. */
 static void load_look(void)
 {
-    char *text = load_text("ENV:OpenGadTools/Look"), *line, *p, w[112], v[112], name[160] = "";   /* name: a whole w[] or Theme buf[] */
+    char *text = load_text("ENV:GFOpenGadTools/Look"), *line, *p, w[112], v[112], name[160] = "";   /* name: a whole w[] or Theme buf[] */
     int mode = OGT_LIGHT, from = 19, to = 7, lite_mode = 2, has_accent = 0;
     unsigned lite = OGT_LITE_SHADOWS | OGT_LITE_ROUNDING | OGT_LITE_GRADIENTS;
     ogt_rgb accent = {0, 0, 0};
@@ -434,7 +434,7 @@ static void load_look(void)
         free(text);
     } else {
         char buf[160], *nl;
-        if (read_small("ENV:OpenGadTools/Theme", buf, sizeof buf)) {
+        if (read_small("ENV:GFOpenGadTools/Theme", buf, sizeof buf)) {
             if ((nl = strchr(buf, '\n'))) { *nl = 0; if (!strncmp(nl + 1, "dark", 4)) mode = OGT_DARK; }
             snprintf(name, sizeof name, "%s", buf);
         }
@@ -473,12 +473,12 @@ static int parse_buttons(const char *s)
     return -1;
 }
 
-/* Look prefs' proposed "buttons" line (Open Apps Look and Feel), read here
- * until OpenGadTools reads it for every app; icons only when it says nothing
- * (every Open app starts with icons, the Team's rule of 10 October 2026). */
+/* Look prefs' proposed "buttons" line (GFOpen Apps Look and Feel), read here
+ * until GFOpenGadTools reads it for every app; icons only when it says nothing
+ * (every GFOpen app starts with icons, the Team's rule of 10 October 2026). */
 static int look_buttons(void)
 {
-    char *text = load_text("ENV:OpenGadTools/Look"), *l;
+    char *text = load_text("ENV:GFOpenGadTools/Look"), *l;
     int style = OGT_TB_ICONS;
     for (l = text; l && *l; l = strchr(l, '\n') ? strchr(l, '\n') + 1 : NULL)
         if (!strncmp(l, "buttons", 7) && (l[7] == ' ' || l[7] == '\t')) {
@@ -558,9 +558,9 @@ static void add_path(const char *path);
 static BPTR lists_reading[LIST_DEPTH];
 static int nlists_reading;
 
-/* A playlist file (.m3u or OpenPlay's own .opl): one path a line. A path
+/* A playlist file (.m3u or GFOpenPlay's own .opl): one path a line. A path
  * without a volume or assign is from the playlist's own drawer, as in other
- * players, not from wherever OpenPlay was started. */
+ * players, not from wherever GFOpenPlay was started. */
 static int add_playlist_file(const char *path)
 {
     char *text, *line;
@@ -612,7 +612,7 @@ static void add_one(const char *path)
     nitems++;
 }
 
-/* A file, or a drawer's files (not its drawers: Open Apps Look and Feel,
+/* A file, or a drawer's files (not its drawers: GFOpen Apps Look and Feel,
  * "a drawer adds what it holds"). */
 static void add_path(const char *path)
 {
@@ -982,9 +982,9 @@ static int ticks_since(const struct DateStamp *a)
  * when a film leaves its window in the moment after DTM_TRIGGER STM_PLAY,
  * before its Display process has started playing: the program waits for
  * that process and that process waits for good. Measured in the lab on
- * 11 October 2026 with cdxl.datatype and openvideo.datatype: taken out at
+ * 11 October 2026 with cdxl.datatype and gfopenvideo.datatype: taken out at
  * once after STM_PLAY it hung every time; a tenth of a second later or
- * more, never. In OpenPlay that was Next or Previous pressed quickly, a
+ * more, never. In GFOpenPlay that was Next or Previous pressed quickly, a
  * key held down, a quick quit, a resize or Full screen and back just after
  * a film began: the window stopped answering. So STM_PLAY goes through
  * film_play(), and every way the object leaves a window goes through
@@ -1019,13 +1019,13 @@ static void film_settle(void)
  * The user, 12 October 2026: films fit the window too, the way of "a hidden screen", and "use opengpu
  * to do the leg work". A film plays on a screen of its own kept behind (the window's screen's mode
  * and depth, so its pixels are in the window's format), in a borderless window there that shares
- * OpenPlay's message port. Whenever the film shows a new frame, OpenPlay draws that screen's picture
+ * GFOpenPlay's message port. Whenever the film shows a new frame, GFOpenPlay draws that screen's picture
  * into its own window at the place Fit, Actual size or Fill gives, with ORTG_WritePixels at another
- * size. openrtg.library 0.16 draws that with OpenGPU's COMPOSITE, one visible piece of the window at
- * a time: on AmigaChrome the host scales the frame, and the 68k touches none of its pixels.
+ * size. gfopenrtg.library 0.16 draws that with GFOpenGPU's COMPOSITE, one visible piece of the window at
+ * a time: on AmiCradle the host scales the frame, and the 68k touches none of its pixels.
  *
- * A film plays in the window at its own size, as before, without openrtg.library 0.16, on an 8-bit
- * screen, when the screen behind can't open, or when OpenGPU would scale on this Amiga's own CPU (no
+ * A film plays in the window at its own size, as before, without gfopenrtg.library 0.16, on an 8-bit
+ * screen, when the screen behind can't open, or when GFOpenGPU would scale on this Amiga's own CPU (no
  * board that draws: every frame's pixels through the 68k would cost more than the film). */
 
 static void tick_start(void)
@@ -1050,8 +1050,8 @@ static void tick_stop(void)
     tick_out = 0;
 }
 
-/* Whether films can go behind: openrtg.library 0.16 drawing the window's screen at 16 or 32 bits, and
- * OpenGPU's COMPOSITE into that format answered by a back end other than the CPU (openrtg.library
+/* Whether films can go behind: gfopenrtg.library 0.16 drawing the window's screen at 16 or 32 bits, and
+ * GFOpenGPU's COMPOSITE into that format answered by a back end other than the CPU (gfopenrtg.library
  * draws a 32-bit screen as XRGB32, or as ARGB32 with its top byte cleared after: either way ARGB32's
  * answer says whether the board does it). */
 static int film_route(struct OpenRTGBitMapInfo *wbi)
@@ -1062,12 +1062,12 @@ static int film_route(struct OpenRTGBitMapInfo *wbi)
     if (OpenRTGBase->lib_Version == 0 && OpenRTGBase->lib_Revision < OP_RTG_SCALE_REVISION) return 0;
     if (!OP_ORTG_BitMapInfo(OpenRTGBase, win->WScreen->RastPort.BitMap, wbi)) return 0;
     if (wbi->depth != 16 && wbi->depth != 32) return 0;
-    if ((gpu = OpenLibrary((CONST_STRPTR)"opengpu.library", 0))) {
+    if ((gpu = OpenLibrary((CONST_STRPTR)"gfopengpu.library", 0))) {
         ULONG q = OP_OGPU_Query(gpu, 0x0020, wbi->depth == 16 ? 2 : 3);  /* COMPOSITE; RGB565 or ARGB32 */
         hw = (q & 0xFF) != 0 && ((q >> 8) & 0xFF) != 0;
         CloseLibrary(gpu);
     }
-    if (!hw) dbg("film: OpenGPU would scale on the CPU here; in the window at its own size");
+    if (!hw) dbg("film: GFOpenGPU would scale on the CPU here; in the window at its own size");
     return hw;
 }
 
@@ -1090,7 +1090,7 @@ static int open_film_screen(LONG w, LONG h)
         ULONG bar = 2 * ((ULONG)ws->BarHeight + 1) + 16;
         if (id && id != INVALID_ID)
             film_scr = OpenScreenTags(NULL, SA_DisplayID, id, SA_Width, (ULONG)w, SA_Height, (ULONG)(h + FILM_GAP) + bar, SA_Depth, (ULONG)wbi.depth,
-                                      SA_Title, (ULONG)"OpenPlay film", SA_ShowTitle, FALSE, SA_Quiet, TRUE, SA_Behind, TRUE,
+                                      SA_Title, (ULONG)"GFOpenPlay film", SA_ShowTitle, FALSE, SA_Quiet, TRUE, SA_Behind, TRUE,
                                       SA_Draggable, FALSE, SA_Type, CUSTOMSCREEN, TAG_DONE);
     }
     if (!film_scr) { dbg("film screen: none"); return 0; }
@@ -1106,7 +1106,7 @@ static int open_film_screen(LONG w, LONG h)
     film_top = film_scr->Height - h;           /* the film's first row on the screen */
     if (film_top < 0) film_top = 0;
     /* The window starts FILM_GAP rows above the film: animation.datatype 47 draws a dark strip about
-     * 200 x 16 at its window's top left (in the window it shows over OpenPlay's title bar), and here it
+     * 200 x 16 at its window's top left (in the window it shows over GFOpenPlay's title bar), and here it
      * falls in that gap rather than on the film. */
     film_win = OpenWindowTags(NULL, WA_CustomScreen, (ULONG)film_scr, WA_Left, 0, WA_Top, film_top - FILM_GAP,
                               WA_Width, film_scr->Width, WA_Height, h + FILM_GAP,
@@ -1120,10 +1120,10 @@ static int open_film_screen(LONG w, LONG h)
     ShowTitle(film_scr, FALSE);             /* the bar behind the window, too */
     /* animation.datatype draws no frames on a screen whose viewport is hidden (VP_HIDE), which Intuition
      * sets on a screen behind: measured in the lab on 12 October 2026, the frames advanced and the screen
-     * behind kept its first picture. OpenRTG shows only the front screen on the board, so on this screen
-     * the flag hides nothing; OpenPlay clears it, and again on each tick. */
+     * behind kept its first picture. GFOpenRTG shows only the front screen on the board, so on this screen
+     * the flag hides nothing; GFOpenPlay clears it, and again on each tick. */
     film_scr->ViewPort.Modes &= ~VP_HIDE;
-    /* the object's news come to OpenPlay's own port */
+    /* the object's news come to GFOpenPlay's own port */
     film_win->UserPort = win->UserPort;
     ModifyIDCMP(film_win, IDCMP_IDCMPUPDATE);
     film_w = w;
@@ -1141,7 +1141,7 @@ static void close_film_screen(void)
     tick_stop();
     if (film_win) {
         struct Node *n, *next;
-        /* the window shares OpenPlay's port: its messages go back before it closes */
+        /* the window shares GFOpenPlay's port: its messages go back before it closes */
         Forbid();
         if (win)
             for (n = win->UserPort->mp_MsgList.lh_Head; (next = n->ln_Succ); n = next)
@@ -1194,7 +1194,7 @@ static void film_present(void)
     struct OpenRTGPixels px;
     LONG sx, sy, sw, sh, dx, dy, dw, dh;
     if (!film_win || dto_in != film_win || !win || film_w <= 0 || film_h <= 0) return;
-    /* where the screen behind's pixels are now: OpenRTG may move a bitmap (asked each time) */
+    /* where the screen behind's pixels are now: GFOpenRTG may move a bitmap (asked each time) */
     if (!OP_ORTG_BitMapInfo(OpenRTGBase, film_scr->RastPort.BitMap, &film_bi) || !film_bi.memory) return;
     film_rects(&sx, &sy, &sw, &sh, &dx, &dy, &dw, &dh);
     if (sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0) return;
@@ -1291,7 +1291,7 @@ static void size_dto(int bx, int by, int bw, int bh, int mode)
         SetAttrs(dto, DTA_TopHoriz, (LONG)tw > bw ? ((LONG)tw - bw) / 2 : 0,
                  DTA_TopVert, (LONG)th > bh ? ((LONG)th - bh) / 2 : 0, TAG_DONE);
     }
-    if (kind == K_SOUND && snd_left && (show_scope || show_overview)) { w = 1; h = 1; }   /* the views are OpenPlay's own */
+    if (kind == K_SOUND && snd_left && (show_scope || show_overview)) { w = 1; h = 1; }   /* the views are GFOpenPlay's own */
     SetAttrs(dto, GA_Left, l, GA_Top, t, GA_Width, w, GA_Height, h, TAG_DONE);
 }
 
@@ -1415,10 +1415,10 @@ static void close_media(void)
 #define OIA_Stats     (TAG_USER + 0x0DA15000 + 2)
 
 /* openamigaimage's datatypes that send the file to the Nursery
- * (openservice.device: the services card or a paired Cradle). */
-static const char *const nursery_datatypes[] = { "openpicture", "opensound", "opendoc", "openvideo", NULL };
+ * (gfopenservice.device: the services card or a paired Cradle). */
+static const char *const nursery_datatypes[] = { "gfopenpicture", "gfopensound", "gfopendoc", "gfopenvideo", NULL };
 
-/* What did the work: what the datatype says (openmodule.datatype names the
+/* What did the work: what the datatype says (gfopenmodule.datatype names the
  * way it plays: this CPU, a cores board core or media.decode/1); else the
  * Nursery for the datatypes above; else this Amiga (webp, webm, the
  * system's own). */
@@ -1435,9 +1435,9 @@ static const char *decoded_by(void)
         if (!strcmp(dt_base, nursery_datatypes[i])) {
             int found;
             Forbid();
-            found = FindName(&SysBase->DeviceList, (CONST_STRPTR)"openservice.device") != NULL;
+            found = FindName(&SysBase->DeviceList, (CONST_STRPTR)"gfopenservice.device") != NULL;
             Permit();
-            return found ? "media.decode/1 through the Nursery" : "the Nursery (openservice.device)";
+            return found ? "media.decode/1 through the Nursery" : "the Nursery (gfopenservice.device)";
         }
     return "this Amiga";
 }
@@ -1470,7 +1470,7 @@ static void show_item(int i, int play)
     close_media();
     cur = i;
     if (list) { ogt_list_select(list, i); ogt_list_show(list, i); }
-    snprintf(win_title, sizeof win_title, "OpenPlay \xb7 %s", base_name(items[i].path));
+    snprintf(win_title, sizeof win_title, "GFOpenPlay \xb7 %s", base_name(items[i].path));
     SetWindowTitles(win, (CONST_STRPTR)win_title, (CONST_STRPTR)~0);
     snprintf(msg, sizeof msg, "Opening %s...", base_name(items[i].path));
     set_status(msg);
@@ -1618,7 +1618,7 @@ static int ask_file(const char *title, int save, int multi, char *out, int size,
     char def[108] = "";                         /* a whole file name, as the requester's default */
     static char last[512];
     if (!AslBase) return 0;
-    lastdir_get("OpenPlay", last, sizeof last);  /* 0.1.2: where the last media came from */
+    lastdir_get("GFOpenPlay", last, sizeof last);  /* 0.1.2: where the last media came from */
     if (save && cur >= 0) {
         strlcpy(def, base_name(items[cur].path), sizeof def);
         if (strrchr(def, '.')) *strrchr(def, '.') = 0;
@@ -1630,7 +1630,7 @@ static int ask_file(const char *title, int save, int multi, char *out, int size,
         return 0;
     if (!AslRequest(fr, NULL)) { FreeAslRequest(fr); return 0; }
     snprintf(out, size, "%s", fr->fr_Drawer);
-    lastdir_put("OpenPlay", (const char *)fr->fr_Drawer);
+    lastdir_put("GFOpenPlay", (const char *)fr->fr_Drawer);
     AddPart((STRPTR)out, fr->fr_File, size);
     if (keep) *keep = fr; else FreeAslRequest(fr);
     return 1;
@@ -1745,7 +1745,7 @@ static void save_list(void)
         text[len++] = '\n';
     }
     if (save_file(path, text, len))
-        set_status("Playlist saved. Open it, or drop it on OpenPlay, to play it again.");
+        set_status("Playlist saved. Open it, or drop it on GFOpenPlay, to play it again.");
     else
         set_status("Couldn't save the playlist there (full, write-protected or protected?). Any old one is as it was.");
     free(text);
@@ -1787,7 +1787,7 @@ static void save_cdxl(void)
         draw_side();
         set_status("CDXL saved and added to the playlist.");
     } else {
-        set_status(rc < 0 ? "ToCDXL isn't installed (C:ToCDXL comes with OpenUp's OpenService part)."
+        set_status(rc < 0 ? "ToCDXL isn't installed (C:ToCDXL comes with GFOpenUp's GFOpenService part)."
                           : "ToCDXL couldn't convert it. It needs the services card or a paired Cradle.");
     }
 }
@@ -1840,11 +1840,11 @@ static void info_window(void)
         else
             snprintf(lines[4], sizeof lines[0], "%s", decoded_by());
     }
-    snprintf(lines[5], sizeof lines[0], "%s", on_amigachrome() ? "AmigaChrome" : "this Amiga");
+    snprintf(lines[5], sizeof lines[0], "%s", on_amicradle() ? "AmiCradle" : "this Amiga");
     {
         ULONG depth = GetBitMapAttr(win->WScreen->RastPort.BitMap, BMA_DEPTH);
         snprintf(lines[6], sizeof lines[0], "%dx%d, %lu-bit%s", win->WScreen->Width, win->WScreen->Height, (unsigned long)depth,
-                 own_scr ? ", OpenPlay's own screen" : "");
+                 own_scr ? ", GFOpenPlay's own screen" : "");
     }
     snprintf(lines[7], sizeof lines[0], "%s", opened_in);
     for (i = 0; i < n; i++) {
@@ -1918,7 +1918,7 @@ static void info_window(void)
 /* ---- full screen ---- */
 
 /* The film or picture alone on a screen of its own, Workbench's mode;
- * Esc, a click or F goes back. OpenRTG scales it on the board.
+ * Esc, a click or F goes back. GFOpenRTG scales it on the board.
  *
  * 0.1.3: the window's own datatype object moves to the full-screen window and back, rather than a
  * second object of the same file beside it (two decoders of one film: the user, 10 October 2026,
@@ -1930,7 +1930,7 @@ static void full_screen(void)
     int done = 0, was_playing = playing && kind == K_VIDEO;
     ULONG fpen;
     if (!dto || cur < 0 || kind == K_SOUND) return;
-    if (!(fs = OpenScreenTags(NULL, SA_LikeWorkbench, TRUE, SA_Title, (ULONG)"OpenPlay", SA_ShowTitle, FALSE,
+    if (!(fs = OpenScreenTags(NULL, SA_LikeWorkbench, TRUE, SA_Title, (ULONG)"GFOpenPlay", SA_ShowTitle, FALSE,
                               SA_Quiet, TRUE, SA_Type, CUSTOMSCREEN, TAG_DONE))) {
         set_status("There isn't memory for a screen of its own. Close something and try again.");
         return;
@@ -2040,9 +2040,9 @@ static void set_menu_checks(void)
 }
 
 /* The part of the screen a full-size window may have: below the title bar,
- * less the strip OpenDock takes along an edge (OpenFiles' free_area(), copied
- * here). OpenDock's window is the one whose screen title starts "OpenDock";
- * an ENV:OpenDock/Free of "left top width height" wins when the dock
+ * less the strip GFOpenDock takes along an edge (GFOpenFiles' free_area(), copied
+ * here). GFOpenDock's window is the one whose screen title starts "GFOpenDock";
+ * an ENV:GFOpenDock/Free of "left top width height" wins when the dock
  * publishes one. Without a dock it is the screen less its title bar. */
 static void free_area(int *l, int *t, int *w, int *h)
 {
@@ -2051,7 +2051,7 @@ static void free_area(int *l, int *t, int *w, int *h)
     ULONG lock;
     LONG got;
     int top = scr->BarHeight + 1, bottom = scr->Height, left = 0, right = scr->Width, a, b, c, d;
-    got = GetVar((STRPTR)"OpenDock/Free", (STRPTR)buf, sizeof buf, GVF_GLOBAL_ONLY);
+    got = GetVar((STRPTR)"GFOpenDock/Free", (STRPTR)buf, sizeof buf, GVF_GLOBAL_ONLY);
     if (got > 0 && sscanf(buf, "%d %d %d %d", &a, &b, &c, &d) == 4 && c >= 400 && d >= 200 && a >= 0 && b >= 0 &&
         a + c <= scr->Width && b + d <= scr->Height) {
         *l = a;
@@ -2062,7 +2062,7 @@ static void free_area(int *l, int *t, int *w, int *h)
     }
     lock = LockIBase(0);
     for (dw = scr->FirstWindow; dw; dw = dw->NextWindow) {
-        if (!dw->ScreenTitle || strncmp((const char *)dw->ScreenTitle, "OpenDock", 8) != 0)
+        if (!dw->ScreenTitle || strncmp((const char *)dw->ScreenTitle, "GFOpenDock", 10) != 0)
             continue;
         if (dw->Width >= dw->Height) {              /* along the top or the bottom */
             if (dw->TopEdge + dw->Height / 2 > scr->Height / 2) {
@@ -2091,10 +2091,10 @@ static void free_area(int *l, int *t, int *w, int *h)
     *h = bottom - top;
 }
 
-/* The first size (the user, 10 October 2026, as in OpenFiles 0.2.3): 800 x
+/* The first size (the user, 10 October 2026, as in GFOpenFiles 0.2.3): 800 x
  * 600, centred in the free area, and never bigger than it, so on a screen
  * smaller than 800 x 600 it is the free area itself. A size the user gives
- * the window is kept and given back by OpenWindows. */
+ * the window is kept and given back by GFOpenWindows. */
 #define START_W 800
 #define START_H 600
 static void start_box(int *l, int *t, int *w, int *h)
@@ -2111,10 +2111,10 @@ static int open_ui(void)
 {
     int w, h, l, t;
     if (want_own) {
-        own_scr = OpenScreenTags(NULL, SA_LikeWorkbench, TRUE, SA_Title, (ULONG)VERSION_TEXT, SA_PubName, (ULONG)"OPENPLAY",
+        own_scr = OpenScreenTags(NULL, SA_LikeWorkbench, TRUE, SA_Title, (ULONG)VERSION_TEXT, SA_PubName, (ULONG)"GFOPENPLAY",
                                  SA_Type, PUBLICSCREEN, TAG_DONE);
         if (own_scr) PubScreenStatus(own_scr, 0);
-        scr = LockPubScreen(own_scr ? (CONST_STRPTR)"OPENPLAY" : NULL);
+        scr = LockPubScreen(own_scr ? (CONST_STRPTR)"GFOPENPLAY" : NULL);
     } else {
         scr = LockPubScreen(NULL);
     }
@@ -2137,7 +2137,7 @@ static int open_ui(void)
     }
     win = OpenWindowTags(NULL, WA_Left, l, WA_Top, t, WA_Width, w, WA_Height, h,
                          WA_MinWidth, w < 400 ? w : 400, WA_MinHeight, h < 240 ? h : 240, WA_MaxWidth, ~0, WA_MaxHeight, ~0,
-                         WA_Title, (ULONG)"OpenPlay", WA_ScreenTitle, (ULONG)VERSION_TEXT, WA_PubScreen, (ULONG)scr,
+                         WA_Title, (ULONG)"GFOpenPlay", WA_ScreenTitle, (ULONG)VERSION_TEXT, WA_PubScreen, (ULONG)scr,
                          WA_NewLookMenus, TRUE, WA_DragBar, TRUE, WA_DepthGadget, TRUE, WA_CloseGadget, TRUE,
                          WA_SizeGadget, TRUE, WA_SizeBBottom, TRUE, WA_Activate, TRUE, WA_SmartRefresh, TRUE,
                          WA_ReportMouse, TRUE,
@@ -2166,7 +2166,7 @@ static int reopen_ui(void)
 
 static void about(void)
 {
-    struct EasyStruct es = { sizeof(struct EasyStruct), 0, (UBYTE *)"About OpenPlay",
+    struct EasyStruct es = { sizeof(struct EasyStruct), 0, (UBYTE *)"About GFOpenPlay",
         (UBYTE *)VERSION_TEXT "\n\nPlays anything a datatype opens: pictures, sounds,\n"
                  "tunes and films. Formats the Amiga can't decode by\nitself come through the Nursery: the services card\n"
                  "or a paired Cradle.\n\nMIT, Copyright (c) 2026 AmigaChrome Team.\nhttps://github.com/DalsinAI/openamigamediaplayer",
@@ -2528,7 +2528,7 @@ out:
     if (AslBase) CloseLibrary(AslBase);
     if (DataTypesBase) CloseLibrary(DataTypesBase);
     if (rda) FreeArgs(rda);
-    if (rc != RETURN_OK) PutStr((CONST_STRPTR)"OpenPlay couldn't open its window (OS 3.2 and datatypes.library 39 needed).\n");
+    if (rc != RETURN_OK) PutStr((CONST_STRPTR)"GFOpenPlay couldn't open its window (OS 3.2 and datatypes.library 39 needed).\n");
     return rc;
 }
 

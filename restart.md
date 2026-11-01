@@ -1,21 +1,21 @@
-# Restart: OpenPlay
+# Restart: GFOpenPlay
 
 _Written 6 October 2026 at about 23:55 UTC, while all work is paused on @SacredTrees's word (23:28 UTC). Read this first when work resumes; the newest capsule and the live PR list win if they disagree._
 
 ## What this repo is
 
-OpenPlay, the Open media player: pictures, sounds, tunes and films, anything a datatype opens, in one OpenGadTools window.
+GFOpenPlay, the Open media player: pictures, sounds, tunes and films, anything a datatype opens, in one GFOpenGadTools window.
 
 ## Where it stands
 
-OpenPlay 0.1 plus seek, volume, Repeat and a slider that follows the film are merged (#1-#3) and ship in OpenUp. Films play to the end with sound at the right rate.
+GFOpenPlay 0.1 plus seek, volume, Repeat and a slider that follows the film are merged (#1-#3) and ship in GFOpenUp. Films play to the end with sound at the right rate.
 
 ## Merged lately
 
-- #4 (173f068, 2026-10-06): Credit who made OpenPlay: CONTRIBUTORS.md
-- #3 (3efef2a, 2026-10-06): OpenPlay: the slider and the buttons follow the film
-- #2 (dc51016, 2026-10-06): OpenPlay: OpenGadTools copied in, its own player icons, volume, seek, Repeat
-- #1 (80fc6f3, 2026-10-06): OpenPlay 0.1: a player for anything a datatype opens
+- #4 (173f068, 2026-10-06): Credit who made GFOpenPlay: CONTRIBUTORS.md
+- #3 (3efef2a, 2026-10-06): GFOpenPlay: the slider and the buttons follow the film
+- #2 (dc51016, 2026-10-06): GFOpenPlay: GFOpenGadTools copied in, its own player icons, volume, seek, Repeat
+- #1 (80fc6f3, 2026-10-06): GFOpenPlay 0.1: a player for anything a datatype opens
 
 ## Open pull requests
 
