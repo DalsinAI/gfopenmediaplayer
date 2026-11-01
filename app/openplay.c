@@ -551,22 +551,48 @@ static int ends_with(const char *s, const char *tail)
 
 static void add_path(const char *path);
 
-/* A playlist file (.m3u or OpenPlay's own .opl): one path a line. */
+/* The playlists being read, outermost first: a list that names itself, or
+ * one that names a list naming it, is not read again (each time would go
+ * one call deeper, till the stack overflows), and lists go 8 deep at most. */
+#define LIST_DEPTH 8
+static BPTR lists_reading[LIST_DEPTH];
+static int nlists_reading;
+
+/* A playlist file (.m3u or OpenPlay's own .opl): one path a line. A path
+ * without a volume or assign is from the playlist's own drawer, as in other
+ * players, not from wherever OpenPlay was started. */
 static int add_playlist_file(const char *path)
 {
     char *text, *line;
+    BPTR l;
+    size_t dir;
+    int i;
     if (!(ends_with(path, ".m3u") || ends_with(path, ".opl"))) return 0;
-    if (!(text = load_text(path))) return 1;
+    if (nlists_reading >= LIST_DEPTH || !(l = Lock((CONST_STRPTR)path, SHARED_LOCK))) return 1;
+    for (i = 0; i < nlists_reading; i++)
+        if (SameLock(l, lists_reading[i]) == LOCK_SAME) { UnLock(l); return 1; }
+    if (!(text = load_text(path))) { UnLock(l); return 1; }
+    lists_reading[nlists_reading++] = l;
+    dir = (size_t)((const char *)PathPart((CONST_STRPTR)path) - path);
     for (line = text; line && *line; ) {
         char *next = strchr(line, '\n');
         if (next) *next = 0;
         if (line[0] && line[0] != '#') {
             char *cr = strchr(line, '\r');
             if (cr) *cr = 0;
-            add_path(line);
+            if (strchr(line, ':') || !dir) {
+                add_path(line);
+            } else if (dir < PATH_LEN) {
+                char full[PATH_LEN];
+                memcpy(full, path, dir);
+                full[dir] = 0;
+                if (AddPart((STRPTR)full, (CONST_STRPTR)line, sizeof full)) add_path(full);
+            }
         }
         line = next ? next + 1 : NULL;
     }
+    nlists_reading--;
+    UnLock(l);
     free(text);
     return 1;
 }
