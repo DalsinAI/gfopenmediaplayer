@@ -1631,17 +1631,98 @@ static void open_or_add(int replace)
     else draw_all();
 }
 
+/* 1 when nothing has the name. */
+static int name_free(const char *name)
+{
+    BPTR lock = Lock((CONST_STRPTR)name, SHARED_LOCK);
+    if (lock) { UnLock(lock); return 0; }
+    return IoErr() == ERROR_OBJECT_NOT_FOUND;
+}
+
+/* A save that fails leaves the file as it was (gfoffice's owf_sys_write_file):
+ * the bytes go to a short name in the same drawer (opl, the task's address
+ * in eight hex digits, two more and .tmp: 17 characters, for a 30-character
+ * file system); only when all of it is written and closed does the old file
+ * step aside (.bak), the new one take its name (Rename doesn't replace a
+ * file) and the old one go. If the new one can't take the name, the old one
+ * gets it back. A drawer or a file protected from writing or deleting isn't
+ * replaced; the new file keeps the old one's comment and protection bits.
+ * 1 when saved. */
+static int save_file(const char *path, const char *data, LONG length)
+{
+    static UBYTE counter;
+    size_t dir = (size_t)((const char *)PathPart((CONST_STRPTR)path) - path);
+    struct FileInfoBlock *fib = NULL;
+    char temp[PATH_LEN + 18], backup[PATH_LEN + 18];
+    unsigned long id = (unsigned long)FindTask(NULL);
+    BPTR fh, lock;
+    int ok = 0, tries;
+    if (path[dir] == '/') dir++;                    /* keep the '/' */
+    if (dir > PATH_LEN) return 0;
+    if ((lock = Lock((CONST_STRPTR)path, SHARED_LOCK))) {
+        int fine;
+        fib = AllocDosObject(DOS_FIB, NULL);
+        fine = fib && Examine(lock, fib) && fib->fib_DirEntryType < 0 &&
+               !(fib->fib_Protection & (FIBF_WRITE | FIBF_DELETE));
+        UnLock(lock);
+        if (!fine) goto done;
+    } else if (IoErr() != ERROR_OBJECT_NOT_FOUND) {
+        return 0;
+    }
+    memcpy(temp, path, dir);
+    memcpy(backup, path, dir);
+    for (tries = 0; tries < 256; tries++) {
+        unsigned n = counter++;
+        snprintf(temp + dir, 18, "opl%08lx%02x.tmp", id, n);
+        snprintf(backup + dir, 18, "opl%08lx%02x.bak", id, n);
+        if (name_free(temp) && name_free(backup)) break;
+    }
+    if (tries == 256 || !(fh = Open((CONST_STRPTR)temp, MODE_NEWFILE))) goto done;
+    ok = !length || Write(fh, (APTR)data, length) == length;
+    if (!Close(fh)) ok = 0;
+    if (!ok) {
+        DeleteFile((CONST_STRPTR)temp);
+    } else if (!fib) {
+        if (!Rename((CONST_STRPTR)temp, (CONST_STRPTR)path)) { DeleteFile((CONST_STRPTR)temp); ok = 0; }
+    } else {
+        /* a new file is not backed up yet: its archive bit stays clear */
+        SetProtection((CONST_STRPTR)temp, fib->fib_Protection & ~FIBF_ARCHIVE);
+        if (fib->fib_Comment[0]) SetComment((CONST_STRPTR)temp, (CONST_STRPTR)fib->fib_Comment);
+        ok = 0;
+        if (!Rename((CONST_STRPTR)path, (CONST_STRPTR)backup)) {
+            DeleteFile((CONST_STRPTR)temp);
+        } else if (!Rename((CONST_STRPTR)temp, (CONST_STRPTR)path)) {
+            Rename((CONST_STRPTR)backup, (CONST_STRPTR)path);
+            DeleteFile((CONST_STRPTR)temp);
+        } else {
+            DeleteFile((CONST_STRPTR)backup);
+            ok = 1;
+        }
+    }
+done:
+    if (fib) FreeDosObject(DOS_FIB, fib);
+    return ok;
+}
+
 static void save_list(void)
 {
-    char path[PATH_LEN] = ".opl";
-    BPTR f;
+    char path[PATH_LEN] = ".opl", *text;
+    LONG len = 0;
     int i;
     if (!nitems || !ask_file("Save the playlist", 1, 0, path, sizeof path, NULL)) return;
     if (!ends_with(path, ".opl") && !ends_with(path, ".m3u")) strncat(path, ".opl", sizeof path - strlen(path) - 1);
-    if (!(f = Open((CONST_STRPTR)path, MODE_NEWFILE))) { set_status("Couldn't write the playlist there. Is the disk write-protected?"); return; }
-    for (i = 0; i < nitems; i++) { Write(f, items[i].path, (LONG)strlen(items[i].path)); Write(f, "\n", 1); }
-    Close(f);
-    set_status("Playlist saved. Open it, or drop it on OpenPlay, to play it again.");
+    if (!(text = malloc((size_t)nitems * PATH_LEN + 1))) { set_status("Not enough memory to save the playlist."); return; }
+    for (i = 0; i < nitems; i++) {
+        size_t n = strlen(items[i].path);
+        memcpy(text + len, items[i].path, n);
+        len += (LONG)n;
+        text[len++] = '\n';
+    }
+    if (save_file(path, text, len))
+        set_status("Playlist saved. Open it, or drop it on OpenPlay, to play it again.");
+    else
+        set_status("Couldn't save the playlist there (full, write-protected or protected?). Any old one is as it was.");
+    free(text);
 }
 
 static void remove_item(void)
