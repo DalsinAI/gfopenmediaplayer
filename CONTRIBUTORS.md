@@ -14,12 +14,12 @@ We are The AmiCradle Team, who build AmiCradle alongside SacredTrees:
 
 ## Copyright holder
 
-GFOpenPlay's code, documents and pictures are Copyright (c) 2026 AmigaChrome
+GFOpenPlay's code, documents and pictures are Copyright (c) 2026 AmiCradle
 Team, released under the MIT licence (`LICENSE`).
 
 ## From our other repositories
 
-- **GFOpenGadTools** (`DalsinAI/opengadtools`): its `lib/`, copied unchanged from `d5f4dff` into `third_party/opengadtools` (MIT, AmigaChrome Team; `FROM` names the commit).
+- **GFOpenGadTools** (`DalsinAI/opengadtools`): its `lib/`, copied unchanged from `d5f4dff` into `third_party/opengadtools` (MIT, AmiCradle Team; `FROM` names the commit).
 
 Everything else here is our own work.
 

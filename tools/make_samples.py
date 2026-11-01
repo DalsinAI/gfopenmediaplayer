@@ -308,7 +308,7 @@ def main():
                         str(tmp / "cdxl_check.png")], capture_output=True, text=True)
     print("  decoded a frame:", "ok" if r.returncode == 0 else r.stderr.strip())
     (out / "README.txt").write_text(
-        "Sample media for GFOpenPlay, made by the AmigaChrome Team (MIT): a chiptune, Boing, and the Boing ball bouncing to it.\n"
+        "Sample media for GFOpenPlay, made by the AmiCradle Team (MIT): a chiptune, Boing, and the Boing ball bouncing to it.\n"
         "  Boing.mod   ProTracker module, 4 channels\n  Boing.mp3   the tune rendered\n"
         "  Boing.mp4   the film, 320 x 180, H.264 + AAC\n  Boing.cdxl  the film for the chipset: CDXL 160 x 100, 32 colours, 12 fps\n"
         "Made by openamigamediaplayer/tools/make_samples.py.\n")

@@ -1,5 +1,5 @@
 /* GFOpenPlay's player icons (op_icons.h).
- * MIT, Copyright (c) 2026 AmigaChrome Team. */
+ * MIT, Copyright (c) 2026 AmiCradle Team. */
 #include <exec/types.h>
 #include <graphics/rastport.h>
 #include <proto/graphics.h>

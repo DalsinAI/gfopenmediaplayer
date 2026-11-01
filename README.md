@@ -56,10 +56,10 @@ I about this file, C save CDXL, A add, M remove, + and - volume.
 
 ## Licence
 
-MIT, Copyright (c) 2026 AmigaChrome Team (`LICENSE`). If you use or build on
+MIT, Copyright (c) 2026 AmiCradle Team (`LICENSE`). If you use or build on
 this work, we ask (we do not require) that you credit the AmiCradle Team and
 AmiCradle.
 
 ## Contributors
 
-GFOpenPlay is created and maintained by [SacredTrees](https://github.com/SacredTrees) with The AmiCradle Team, copyright AmigaChrome Team. Everyone whose work it includes is credited in [`CONTRIBUTORS.md`](CONTRIBUTORS.md).
+GFOpenPlay is created and maintained by [SacredTrees](https://github.com/SacredTrees) with The AmiCradle Team, copyright AmiCradle Team. Everyone whose work it includes is credited in [`CONTRIBUTORS.md`](CONTRIBUTORS.md).
