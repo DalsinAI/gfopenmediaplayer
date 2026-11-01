@@ -1,7 +1,7 @@
-/* The parts of openrtg.library OpenPlay uses for films that fit the window
+/* The parts of gfopenrtg.library GFOpenPlay uses for films that fit the window
  * (0.1.6): what a bitmap is (ORTG_BitMapInfo) and pixels written at another
- * size (ORTG_WritePixels with dest_width and dest_height), which openrtg.library
- * 0.16 draws with OpenGPU's COMPOSITE, on the host on AmigaChrome. The same
+ * size (ORTG_WritePixels with dest_width and dest_height), which gfopenrtg.library
+ * 0.16 draws with GFOpenGPU's COMPOSITE, on the host on AmiCradle. The same
  * layouts and LVOs as openamigartg's include/openrtg/openrtg.h and
  * include/inline/openrtg.h.
  * MIT, Copyright (c) 2026 AmigaChrome Team. */
@@ -12,8 +12,8 @@
 #include <graphics/rastport.h>
 #include <inline/macros.h>
 
-#define OP_RTG_NAME "openrtg.library"
-#define OP_RTG_SCALE_REVISION 16        /* 0.16: pixels at another size through OpenGPU */
+#define OP_RTG_NAME "gfopenrtg.library"
+#define OP_RTG_SCALE_REVISION 16        /* 0.16: pixels at another size through GFOpenGPU */
 
 struct OpenRTGPixels {
     void                *data;              /* row 0 of the memory */

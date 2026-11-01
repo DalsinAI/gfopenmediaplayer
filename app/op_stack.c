@@ -1,9 +1,9 @@
-/* OpenPlay: run main on a stack of our own size.
+/* GFOpenPlay: run main on a stack of our own size.
  * MIT, Copyright (c) 2026 AmigaChrome Team.
  *
  * Run and a Shell give a program the Shell's stack (4 KB by default), and
  * libnix ignores __stack. Opening a drawer needs more than that: with 4 KB
- * OpenPlay overran its stack and failed (8000000B). */
+ * GFOpenPlay overran its stack and failed (8000000B). */
 #include "op_stack.h"
 #include <exec/types.h>
 #include <exec/tasks.h>

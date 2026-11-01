@@ -1,6 +1,6 @@
-/* OpenPlay's player icons, drawn from shapes on a 48 x 48 grid in the
- * GlowIcons style of OpenGadTools' own (ogt_icons). They stay here until
- * OpenGadTools has player icons; then OpenPlay uses those.
+/* GFOpenPlay's player icons, drawn from shapes on a 48 x 48 grid in the
+ * GlowIcons style of GFOpenGadTools' own (ogt_icons). They stay here until
+ * GFOpenGadTools has player icons; then GFOpenPlay uses those.
  * MIT, Copyright (c) 2026 AmigaChrome Team. */
 #ifndef OP_ICONS_H
 #define OP_ICONS_H

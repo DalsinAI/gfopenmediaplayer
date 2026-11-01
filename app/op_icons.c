@@ -1,4 +1,4 @@
-/* OpenPlay's player icons (op_icons.h).
+/* GFOpenPlay's player icons (op_icons.h).
  * MIT, Copyright (c) 2026 AmigaChrome Team. */
 #include <exec/types.h>
 #include <graphics/rastport.h>
