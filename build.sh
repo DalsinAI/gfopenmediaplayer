@@ -3,7 +3,7 @@
 # the GFOpenGadTools library copied into third_party/opengadtools (its FROM
 # says which commit). Built for the 68040, integer maths only.
 #   ./build.sh [OUT_DIR]           (default build/os3)
-# MIT, Copyright (c) 2026 AmigaChrome Team.
+# MIT, Copyright (c) 2026 AmiCradle Team.
 # The compiler: OS32_GCC16, else STOVE, else ~/AmiCradle/stoves/os32-gcc16. It stops when given an older GCC
 # (the os32 stove's GCC 6.5.0b merges a word clear and the long clear after it into one clr.l at -O2) and builds
 # -fno-tree-loop-distribute-patterns (GCC 16.2.0b's loop-shift trap).

@@ -4,7 +4,7 @@
  * 0.16 draws with GFOpenGPU's COMPOSITE, on the host on AmiCradle. The same
  * layouts and LVOs as openamigartg's include/openrtg/openrtg.h and
  * include/inline/openrtg.h.
- * MIT, Copyright (c) 2026 AmigaChrome Team. */
+ * MIT, Copyright (c) 2026 AmiCradle Team. */
 #ifndef OP_RTG_H
 #define OP_RTG_H
 
