@@ -6,7 +6,7 @@ GFOpenGadTools theme) are in the Team's design archive. The rules are GFOpen App
 ## 1. What it is
 
 A player for anything datatypes.library opens. It never decodes a format
-itself: the datatypes do (openamigaimage's gfopenpicture, gfopensound, gfopenvideo,
+itself: the datatypes do (gfopenimage's gfopenpicture, gfopensound, gfopenvideo,
 webp and webm, and the OS's own). So the player stays small, and every new
 datatype is a new format for it.
 
@@ -44,7 +44,7 @@ datatype is a new format for it.
   playing (Slideshow for pictures).
 - **Toggles** (Repeat, Playlist) draw pressed while on.
 - **The status line** names the datatype and what decoded the file: what
-  the datatype says through openamigaimage's `OIA_DecodedBy` attribute
+  the datatype says through gfopenimage's `OIA_DecodedBy` attribute
   (gfopenmodule.datatype: this Amiga's CPU, a cores board core or
   media.decode/1), else the Nursery for gfopenpicture, gfopensound, gfopendoc and
   gfopenvideo, else this Amiga. Info adds the datatype's `OIA_Stats`. Over a

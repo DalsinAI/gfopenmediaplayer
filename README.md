@@ -6,7 +6,7 @@ user's GFOpenLook theme. A new datatype is a new format for GFOpenPlay, with
 nothing else to install.
 
 We, 6 October 2026: "we will need a cool media player for this, that shows
-off the datatypes and the new opengadtools interface and open rtg".
+off the datatypes and the new gfopengadtools interface and open rtg".
 
 - **One window:** a toolbar, the picture or film, the position, a playlist
   and a status line that says which datatype opened the file and what decoded
@@ -23,7 +23,7 @@ off the datatypes and the new opengadtools interface and open rtg".
 - **Full screen** on a screen of its own (GFOpenRTG scales it on the board),
   and **View › Own screen** for the whole player.
 - **Save CDXL** turns a film into a CDXL the chipset plays by itself, with
-  ToCDXL (openamigaservice), for an AGA Amiga.
+  ToCDXL (gfopenservice), for an AGA Amiga.
 - **Drag and drop:** files and drawers dropped on the window join the
   playlist. Playlists save as `.opl` and open `.m3u`.
 
@@ -31,7 +31,7 @@ off the datatypes and the new opengadtools interface and open rtg".
 
 Status, 6 October 2026: 0.1, built and tested on AmiCradle with OS 3.2.3.
 Pictures, sound and tunes play. Films open, but playing them waits on a fix in
-gfopenvideo.datatype (openamigaimage).
+gfopenvideo.datatype (gfopenimage).
 
 ## Building
 

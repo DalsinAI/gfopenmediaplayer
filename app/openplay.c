@@ -351,7 +351,7 @@ static int on_amicradle(void)
     return ac;
 }
 
-/* Whether gfopengpu.library draws in hardware (opengadtools' ogt_gpu.h): an ARGB
+/* Whether gfopengpu.library draws in hardware (gfopengadtools' ogt_gpu.h): an ARGB
  * composite answered by a back end other than the CPU (back end 0). On a real
  * Amiga only the CPU back end runs, since ACRTG.gpu needs AmiCradle's board. */
 #define OP_OGPU_Query(base, op, fmt) \
@@ -1408,13 +1408,13 @@ static void close_media(void)
     dt_name[0] = dt_base[0] = 0;
 }
 
-/* openamigaimage's own attributes (its Datatypes/include/datatypes/openimage.h):
+/* gfopenimage's own attributes (its Datatypes/include/datatypes/openimage.h):
  * what decodes or plays an object, and how that has gone, in words. A
  * datatype that doesn't know them answers OM_GET with FALSE. */
 #define OIA_DecodedBy (TAG_USER + 0x0DA15000 + 1)
 #define OIA_Stats     (TAG_USER + 0x0DA15000 + 2)
 
-/* openamigaimage's datatypes that send the file to the Nursery
+/* gfopenimage's datatypes that send the file to the Nursery
  * (gfopenservice.device: the services card or a paired Cradle). */
 static const char *const nursery_datatypes[] = { "gfopenpicture", "gfopensound", "gfopendoc", "gfopenvideo", NULL };
 
@@ -1765,7 +1765,7 @@ static void remove_item(void)
 }
 
 /* Save CDXL: the film as a CDXL the chipset plays by itself (ToCDXL,
- * openamigaservice), for an AGA Amiga with no services. */
+ * gfopenservice), for an AGA Amiga with no services. */
 static void save_cdxl(void)
 {
     char path[PATH_LEN] = ".cdxl", cmd[PATH_LEN * 2 + 64];
@@ -2169,7 +2169,7 @@ static void about(void)
     struct EasyStruct es = { sizeof(struct EasyStruct), 0, (UBYTE *)"About GFOpenPlay",
         (UBYTE *)VERSION_TEXT "\n\nPlays anything a datatype opens: pictures, sounds,\n"
                  "tunes and films. Formats the Amiga can't decode by\nitself come through the Nursery: the services card\n"
-                 "or a paired Cradle.\n\nMIT, Copyright (c) 2026 AmiCradle Team.\nhttps://github.com/DalsinAI/openamigamediaplayer",
+                 "or a paired Cradle.\n\nMIT, Copyright (c) 2026 AmiCradle Team.\nhttps://github.com/DalsinAI/gfopenmediaplayer",
         (UBYTE *)"Close" };
     EasyRequestArgs(win, &es, NULL, NULL);
 }

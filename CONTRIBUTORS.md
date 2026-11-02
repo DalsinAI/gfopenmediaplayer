@@ -19,7 +19,7 @@ Team, released under the MIT licence (`LICENSE`).
 
 ## From our other repositories
 
-- **GFOpenGadTools** (`DalsinAI/opengadtools`): its `lib/`, copied unchanged from `d5f4dff` into `third_party/opengadtools` (MIT, AmiCradle Team; `FROM` names the commit).
+- **GFOpenGadTools** (`DalsinAI/gfopengadtools`): its `lib/`, copied unchanged from `d5f4dff` into `third_party/opengadtools` (MIT, AmiCradle Team; `FROM` names the commit).
 
 Everything else here is our own work.
 
