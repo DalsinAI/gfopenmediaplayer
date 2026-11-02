@@ -2,7 +2,7 @@
  * (0.1.6): what a bitmap is (ORTG_BitMapInfo) and pixels written at another
  * size (ORTG_WritePixels with dest_width and dest_height), which gfopenrtg.library
  * 0.16 draws with GFOpenGPU's COMPOSITE, on the host on AmiCradle. The same
- * layouts and LVOs as openamigartg's include/openrtg/openrtg.h and
+ * layouts and LVOs as gfopenrtg's include/openrtg/openrtg.h and
  * include/inline/openrtg.h.
  * MIT, Copyright (c) 2026 AmiCradle Team. */
 #ifndef OP_RTG_H
