@@ -54,6 +54,34 @@ I about this file, C save CDXL, A add, M remove, + and - volume.
 
 `OPENPLAY_DEBUG` set to a file's name writes a line for each step there.
 
+## ARexx
+
+GFOpenPlay has an ARexx port, `GFOPENPLAY.1`, on arexx.class (GFOpenSDK's `arexx/apphost.h`, copied into `third_party/gfopensdk`).
+
+| Command | Does |
+| --- | --- |
+| `OPEN FILE/A` | a new playlist of FILE (a drawer: what is in it), shown and played |
+| `ADD FILE/A` | FILE, or a drawer's files, at the end of the playlist |
+| `PLAY`, `PAUSE`, `STOP` | as the buttons |
+| `NEXT`, `PREV` | the next or the previous item |
+| `CLEAR` | an empty playlist |
+| `VOLUME LEVEL/N/A` | 0 to 64 |
+| `GETFILE` | RESULT: the item being shown |
+| `STATUS` | RESULT: `PLAYING` or `STOPPED`, the item's number, the number of items (`PLAYING 2 5`) |
+| `QUIT`, `ACTIVATE`, `VERSION`, `HELP`, `FAULT` | the standard commands (`DEACTIVATE` answers RC 5: no icon yet) |
+
+The package's `Rexx/` drawer has `PlayDrawer.rexx`: `rx Rexx/PlayDrawer.rexx Work:Music 40`.
+
+```
+/* GFOpenPlay: play a drawer of music quietly */
+OPTIONS RESULTS
+ADDRESS 'GFOPENPLAY.1'
+'OPEN Work:Music'
+'VOLUME 32'
+'STATUS'
+SAY result
+```
+
 ## Licence
 
 MIT, Copyright (c) 2026 AmiCradle Team (`LICENSE`). If you use or build on

@@ -2454,6 +2454,109 @@ static void tooltypes(struct WBStartup *wb)
     CurrentDir(old);
 }
 
+/* ---- ARexx: GFOPENPLAY.1, on arexx.class (GFOpenSDK arexx/apphost.h) ----
+ *   OPEN FILE/A     a new playlist of FILE (a drawer: what is in it), shown
+ *   ADD FILE/A      FILE (or a drawer's files) at the end of the playlist
+ *   PLAY            play (or go on after PAUSE)
+ *   PAUSE           pause
+ *   STOP            stop
+ *   NEXT, PREV      the next or the previous item
+ *   CLEAR           an empty playlist
+ *   VOLUME LEVEL/N/A  0 to 64
+ *   GETFILE         RESULT: the item being shown ("" when none)
+ *   STATUS          RESULT: PLAYING or STOPPED, the item's number from 1,
+ *                   the number of items ("PLAYING 2 5")
+ * and QUIT FORCE, ACTIVATE, DEACTIVATE (RC 5: no icon yet), VERSION, HELP,
+ * FAULT. */
+#include <arexx/apphost.h>
+
+static ah_host *rexx;
+static int rexx_quit;
+
+static int rx_exists(ah_call *c)
+{
+    BPTR l = Lock((CONST_STRPTR)ah_str(c, 0), SHARED_LOCK);
+    if (!l) {
+        ah_error(c, 10, IoErr());
+        return 0;
+    }
+    UnLock(l);
+    return 1;
+}
+
+static void rx_open(ah_call *c)
+{
+    if (!rx_exists(c)) return;
+    command(C_CLEAR);
+    add_path(ah_str(c, 0));
+    if (nitems) show_item(0, 1);
+    else ah_error(c, 10, 0);
+    draw_all();
+}
+
+static void rx_add(ah_call *c)
+{
+    int was = nitems;
+    if (!rx_exists(c)) return;
+    add_path(ah_str(c, 0));
+    if (list) ogt_list_set_count(list, nitems);
+    if (nitems == was) ah_error(c, 5, 0);
+    else if (cur < 0) show_item(0, 0);
+    draw_all();
+}
+
+static void rx_play(ah_call *c) { (void)c; if (!playing) play_pause(); }
+static void rx_pause(ah_call *c) { (void)c; if (playing) play_pause(); }
+static void rx_stop(ah_call *c) { (void)c; stop(); }
+static void rx_next(ah_call *c) { (void)c; command(C_NEXT); }
+static void rx_prev(ah_call *c) { (void)c; command(C_PREV); }
+static void rx_clear(ah_call *c) { (void)c; command(C_CLEAR); }
+static void rx_volume(ah_call *c) { set_volume((int)ah_num(c, 0, volume)); }
+
+static void rx_getfile(ah_call *c)
+{
+    ah_result(c, "%s", cur >= 0 && cur < nitems ? items[cur].path : "");
+}
+
+static void rx_status(ah_call *c)
+{
+    ah_result(c, "%s %d %d", playing ? "PLAYING" : "STOPPED", cur + 1, nitems);
+}
+
+static const ah_cmd rexx_cmds[] = {
+    { "OPEN", "FILE/A", rx_open },
+    { "ADD", "FILE/A", rx_add },
+    { "PLAY", "", rx_play },
+    { "PAUSE", "", rx_pause },
+    { "STOP", "", rx_stop },
+    { "NEXT", "", rx_next },
+    { "PREV", "", rx_prev },
+    { "CLEAR", "", rx_clear },
+    { "VOLUME", "LEVEL/N/A", rx_volume },
+    { "GETFILE", "", rx_getfile },
+    { "STATUS", "", rx_status },
+    { NULL, NULL, NULL }
+};
+
+static int rx_quit_hook(void *user, int force)
+{
+    (void)user; (void)force;
+    rexx_quit = 1;
+    return 1;
+}
+
+static void rx_front_hook(void *user)
+{
+    (void)user;
+    if (win) {
+        if (win->WScreen) ScreenToFront(win->WScreen);
+        WindowToFront(win);
+        ActivateWindow(win);
+    }
+}
+
+static const ah_hooks rexx_hooks = { VERSION_TEXT, rx_quit_hook, rx_front_hook, NULL, NULL };
+
 static int op_main(void)
 {
     LONG args[3] = { 0, 0, 0 };
@@ -2486,12 +2589,14 @@ static int op_main(void)
     }
     appport = CreateMsgPort();
     if (!open_ui()) goto out;
+    rexx = ah_open("GFOPENPLAY", rexx_cmds, &rexx_hooks);
     if (nitems) show_item(0, 1);
     else set_status("Drop pictures, sounds, films or drawers on the window, or choose Open.");
 
     while (!quit) {
         ULONG tick_sig = tick_port ? 1UL << tick_port->mp_SigBit : 0;
-        ULONG got = Wait((1UL << win->UserPort->mp_SigBit) | SIGBREAKF_CTRL_C | (appport ? 1UL << appport->mp_SigBit : 0) | tick_sig);
+        ULONG got = Wait((1UL << win->UserPort->mp_SigBit) | SIGBREAKF_CTRL_C | (appport ? 1UL << appport->mp_SigBit : 0) | tick_sig |
+                         ah_sigmask(rexx));
         struct IntuiMessage *m;
         if (got & SIGBREAKF_CTRL_C) quit = 1;
         if ((got & tick_sig) && tick_out && CheckIO((struct IORequest *)tick_req)) {
@@ -2501,12 +2606,18 @@ static int op_main(void)
             tick_start();
         }
         if (appport && (got & (1UL << appport->mp_SigBit))) app_news();
+        if (got & ah_sigmask(rexx)) {
+            ah_handle(rexx);
+            if (rexx_quit) quit = 1;
+        }
         while (!quit && win && (m = GT_GetIMsg(win->UserPort)))
             quit = main_event(m);
         if (!win) break;
     }
     rc = RETURN_OK;
 out:
+    ah_close(rexx);
+    rexx = NULL;
     close_ui();
     if (appport) {
         struct Message *msg;
