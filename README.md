@@ -70,6 +70,8 @@ GFOpenPlay has an ARexx port, `GFOPENPLAY.1`, on arexx.class (GFOpenSDK's `arexx
 | `STATUS` | RESULT: `PLAYING` or `STOPPED`, the item's number, the number of items (`PLAYING 2 5`) |
 | `QUIT`, `ACTIVATE`, `VERSION`, `HELP`, `FAULT` | the standard commands (`DEACTIVATE` answers RC 5: no icon yet) |
 
+The package's `Rexx/` drawer has `PlayDrawer.rexx`: `rx Rexx/PlayDrawer.rexx Work:Music 40`.
+
 ```
 /* GFOpenPlay: play a drawer of music quietly */
 OPTIONS RESULTS
