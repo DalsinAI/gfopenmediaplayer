@@ -1,7 +1,8 @@
 #!/bin/sh
 # GFOpenPlay for OS 3.2 with the os32-gcc16 stove (m68k-amigaos-gcc 16, NDK 3.2), and
 # the GFOpenGadTools library copied into third_party/opengadtools (its FROM
-# says which commit). Built for the 68040, integer maths only.
+# says which commit), and GFOpenSDK's arexx/apphost.h (the ARexx port) in
+# third_party/gfopensdk. Built for the 68040, integer maths only.
 #   ./build.sh [OUT_DIR]           (default build/os3)
 # MIT, Copyright (c) 2026 AmiCradle Team.
 # The compiler: OS32_GCC16, else STOVE, else ~/AmiCradle/stoves/os32-gcc16. It stops when given an older GCC
@@ -19,7 +20,7 @@ mkdir -p "$OUT"
 # Soft float: -m68040 links libnix's soft libm020, not libm881
 # (specs/m68k-soft-m68040.specs: -m68040 alone would link the FPU libm).
 SOFT="-specs=$HERE/specs/m68k-soft-m68040.specs"
-FLAGS="-noixemul -m68040 $SOFT -std=gnu99 -Wall -Werror -O2 -fno-tree-loop-distribute-patterns -fno-delete-null-pointer-checks -fno-common -I$HERE/app -I$OGT"
+FLAGS="-noixemul -m68040 $SOFT -std=gnu99 -Wall -Werror -O2 -fno-tree-loop-distribute-patterns -fno-delete-null-pointer-checks -fno-common -I$HERE/app -I$OGT -I$HERE/third_party/gfopensdk"
 # shellcheck disable=SC2086
 "$CC" $FLAGS -o "$OUT/GFOpenPlay" \
     "$HERE/app/openplay.c" "$HERE/app/op_icons.c" "$HERE/app/op_stack.c" \
