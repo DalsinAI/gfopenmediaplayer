@@ -71,8 +71,9 @@
 #include "op_stack.h"
 #include "op_icons.h"
 #include "op_rtg.h"
+#include "op_media_control.h"
 
-#define VERSION_TEXT "GFOpenPlay 0.1.6 (12.10.2026)"
+#define VERSION_TEXT "GFOpenPlay 0.1.7 (14.11.2026)"
 static const char version[] __attribute__((used)) = "$VER: " VERSION_TEXT " MIT, Copyright (c) 2026 AmiCradle Team";
 
 struct Library *DataTypesBase, *AslBase, *IFFParseBase, *IconBase, *WorkbenchBase;
@@ -2466,6 +2467,11 @@ static void tooltypes(struct WBStartup *wb)
  *   GETFILE         RESULT: the item being shown ("" when none)
  *   STATUS          RESULT: PLAYING or STOPPED, the item's number from 1,
  *                   the number of items ("PLAYING 2 5")
+ *   SEEK POSITION/N/A   seek a film to POSITION milliseconds
+ *   GETPOSITION, GETDURATION   RESULT: milliseconds
+ *   GETINFO         RESULT: datatype, kind and decoder
+ *   GETPATH         RESULT: the decoder/backend path the datatype reports
+ *   FULLSCREEN      enter the current picture or film's full-screen view
  * and QUIT FORCE, ACTIVATE, DEACTIVATE (RC 5: no icon yet), VERSION, HELP,
  * FAULT. */
 #include <arexx/apphost.h>
@@ -2523,6 +2529,70 @@ static void rx_status(ah_call *c)
     ah_result(c, "%s %d %d", playing ? "PLAYING" : "STOPPED", cur + 1, nitems);
 }
 
+static void rx_seek(ah_call *c)
+{
+    LONG ms = ah_num(c, 0, -1);
+    if (!dto || kind != K_VIDEO || frames <= 0 || fps <= 0 || ms < 0) {
+        ah_error(c, 5, 0);
+        return;
+    }
+    frame = (int)op_video_seek_frame((ULONG)ms, (ULONG)frames, (ULONG)fps);
+    SetDTAttrs(dto, DTWIN, NULL, ADTA_Frame, (ULONG)frame, TAG_DONE);
+    draw_seek();
+}
+
+static void rx_getposition(ah_call *c)
+{
+    ULONG ms;
+    if (kind == K_VIDEO && frames > 0 && fps > 0)
+        ms = op_video_position_ms((ULONG)(frame < 0 ? 0 : frame), (ULONG)fps);
+    else if (kind == K_SOUND && snd_rate)
+        ms = op_sound_position_ms(snd_pos(), snd_rate);
+    else {
+        ah_error(c, 5, 0);
+        return;
+    }
+    ah_result(c, "%lu", (unsigned long)ms);
+}
+
+static void rx_getduration(ah_call *c)
+{
+    ULONG ms;
+    if (kind == K_VIDEO && frames > 0 && fps > 0)
+        ms = op_video_duration_ms((ULONG)frames, (ULONG)fps);
+    else if (kind == K_SOUND && snd_rate && snd_len)
+        ms = op_sound_duration_ms(snd_len, snd_rate);
+    else {
+        ah_error(c, 5, 0);
+        return;
+    }
+    ah_result(c, "%lu", (unsigned long)ms);
+}
+
+static void rx_getinfo(ah_call *c)
+{
+    if (!dto) { ah_error(c, 5, 0); return; }
+    ah_result(c, "DATATYPE %s KIND %s DECODER %s", dt_base[0] ? dt_base : "?", kind_word[kind], decoded_by());
+}
+
+static void rx_getpath(ah_call *c)
+{
+    STRPTR stats = NULL;
+    const char *by;
+    if (!dto) { ah_error(c, 5, 0); return; }
+    by = decoded_by();
+    if (GetDTAttrs(dto, OIA_Stats, (ULONG)&stats, TAG_DONE) && stats && *stats)
+        ah_result(c, "%s; %s", by, (const char *)stats);
+    else
+        ah_result(c, "%s", by);
+}
+
+static void rx_fullscreen(ah_call *c)
+{
+    if (!dto || kind == K_SOUND) { ah_error(c, 5, 0); return; }
+    full_screen();
+}
+
 static const ah_cmd rexx_cmds[] = {
     { "OPEN", "FILE/A", rx_open },
     { "ADD", "FILE/A", rx_add },
@@ -2535,6 +2605,12 @@ static const ah_cmd rexx_cmds[] = {
     { "VOLUME", "LEVEL/N/A", rx_volume },
     { "GETFILE", "", rx_getfile },
     { "STATUS", "", rx_status },
+    { "SEEK", "POSITION/N/A", rx_seek },
+    { "GETPOSITION", "", rx_getposition },
+    { "GETDURATION", "", rx_getduration },
+    { "GETINFO", "", rx_getinfo },
+    { "GETPATH", "", rx_getpath },
+    { "FULLSCREEN", "", rx_fullscreen },
     { NULL, NULL, NULL }
 };
 

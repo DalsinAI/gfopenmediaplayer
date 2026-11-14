@@ -68,7 +68,17 @@ GFOpenPlay has an ARexx port, `GFOPENPLAY.1`, on arexx.class (GFOpenSDK's `arexx
 | `VOLUME LEVEL/N/A` | 0 to 64 |
 | `GETFILE` | RESULT: the item being shown |
 | `STATUS` | RESULT: `PLAYING` or `STOPPED`, the item's number, the number of items (`PLAYING 2 5`) |
+| `SEEK POSITION/N/A` | seek a film to POSITION milliseconds; RC 5 where the datatype has no frame seek |
+| `GETPOSITION`, `GETDURATION` | RESULT: milliseconds for a sound or film; RC 5 when unknown |
+| `GETINFO` | RESULT: the datatype, media kind and decoder |
+| `GETPATH` | RESULT: the decoder/backend path and the datatype's measured stats when it supplies them |
+| `FULLSCREEN` | enter the current picture or film's full-screen view; returns when that view closes |
 | `QUIT`, `ACTIVATE`, `VERSION`, `HELP`, `FAULT` | the standard commands (`DEACTIVATE` answers RC 5: no icon yet) |
+
+`tests/arexx.rexx FILE` exercises the non-modal control path against a
+running player. `SETRUNG` deliberately is not a no-op command: it lands when
+the media datatypes expose the AkikoPlus rung/policy attribute to their
+caller, so a successful answer always means the device actually changed.
 
 The package's `Rexx/` drawer has `PlayDrawer.rexx`: `rx Rexx/PlayDrawer.rexx Work:Music 40`.
 
