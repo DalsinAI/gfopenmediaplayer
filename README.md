@@ -68,7 +68,15 @@ GFOpenPlay has an ARexx port, `GFOPENPLAY.1`, on arexx.class (GFOpenSDK's `arexx
 | `VOLUME LEVEL/N/A` | 0 to 64 |
 | `GETFILE` | RESULT: the item being shown |
 | `STATUS` | RESULT: `PLAYING` or `STOPPED`, the item's number, the number of items (`PLAYING 2 5`) |
+| `SEEK POSITION/N/A` | seek a film to POSITION milliseconds; RC 5 where the datatype has no frame seek |
+| `GETPOSITION`, `GETDURATION` | RESULT: milliseconds for a sound or film; RC 5 when unknown |
+| `GETINFO` | RESULT: the datatype, media kind and decoder |
+| `FULLSCREEN` | enter the current picture or film's full-screen view after replying; no requester holds the ARexx sender |
 | `QUIT`, `ACTIVATE`, `VERSION`, `HELP`, `FAULT` | the standard commands (`DEACTIVATE` answers RC 5: no icon yet) |
+
+`tests/arexx.rexx FILE` exercises the non-modal control path against a
+running player. AkikoPlus chooses its decode implementation internally;
+clients neither select nor inspect a rung or route.
 
 The package's `Rexx/` drawer has `PlayDrawer.rexx`: `rx Rexx/PlayDrawer.rexx Work:Music 40`.
 

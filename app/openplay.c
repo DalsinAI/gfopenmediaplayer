@@ -71,8 +71,9 @@
 #include "op_stack.h"
 #include "op_icons.h"
 #include "op_rtg.h"
+#include "op_media_control.h"
 
-#define VERSION_TEXT "GFOpenPlay 0.1.6 (12.10.2026)"
+#define VERSION_TEXT "GFOpenPlay 0.1.7 (14.11.2026)"
 static const char version[] __attribute__((used)) = "$VER: " VERSION_TEXT " MIT, Copyright (c) 2026 AmiCradle Team";
 
 struct Library *DataTypesBase, *AslBase, *IFFParseBase, *IconBase, *WorkbenchBase;
@@ -2466,12 +2467,17 @@ static void tooltypes(struct WBStartup *wb)
  *   GETFILE         RESULT: the item being shown ("" when none)
  *   STATUS          RESULT: PLAYING or STOPPED, the item's number from 1,
  *                   the number of items ("PLAYING 2 5")
+ *   SEEK POSITION/N/A   seek a film to POSITION milliseconds
+ *   GETPOSITION, GETDURATION   RESULT: milliseconds
+ *   GETINFO         RESULT: datatype, kind and decoder
+ *   FULLSCREEN      enter the current picture or film's full-screen view
  * and QUIT FORCE, ACTIVATE, DEACTIVATE (RC 5: no icon yet), VERSION, HELP,
  * FAULT. */
 #include <arexx/apphost.h>
 
 static ah_host *rexx;
 static int rexx_quit;
+static int rexx_fullscreen;
 
 static int rx_exists(ah_call *c)
 {
@@ -2523,6 +2529,60 @@ static void rx_status(ah_call *c)
     ah_result(c, "%s %d %d", playing ? "PLAYING" : "STOPPED", cur + 1, nitems);
 }
 
+static void rx_seek(ah_call *c)
+{
+    LONG ms = ah_num(c, 0, -1);
+    if (!dto || kind != K_VIDEO || frames <= 0 || fps <= 0 || ms < 0) {
+        ah_error(c, 5, 0);
+        return;
+    }
+    frame = (int)op_video_seek_frame((ULONG)ms, (ULONG)frames, (ULONG)fps);
+    SetDTAttrs(dto, DTWIN, NULL, ADTA_Frame, (ULONG)frame, TAG_DONE);
+    draw_seek();
+}
+
+static void rx_getposition(ah_call *c)
+{
+    ULONG ms;
+    if (kind == K_VIDEO && frames > 0 && fps > 0)
+        ms = op_video_position_ms((ULONG)(frame < 0 ? 0 : frame), (ULONG)fps);
+    else if (kind == K_SOUND && snd_rate)
+        ms = op_sound_position_ms(snd_pos(), snd_rate);
+    else {
+        ah_error(c, 5, 0);
+        return;
+    }
+    ah_result(c, "%lu", (unsigned long)ms);
+}
+
+static void rx_getduration(ah_call *c)
+{
+    ULONG ms;
+    if (kind == K_VIDEO && frames > 0 && fps > 0)
+        ms = op_video_duration_ms((ULONG)frames, (ULONG)fps);
+    else if (kind == K_SOUND && snd_rate && snd_len)
+        ms = op_sound_duration_ms(snd_len, snd_rate);
+    else {
+        ah_error(c, 5, 0);
+        return;
+    }
+    ah_result(c, "%lu", (unsigned long)ms);
+}
+
+static void rx_getinfo(ah_call *c)
+{
+    if (!dto) { ah_error(c, 5, 0); return; }
+    ah_result(c, "DATATYPE %s KIND %s DECODER %s", dt_base[0] ? dt_base : "?", kind_word[kind], decoded_by());
+}
+
+static void rx_fullscreen(ah_call *c)
+{
+    if (!dto || kind == K_SOUND) { ah_error(c, 5, 0); return; }
+    /* Reply first. The full-screen view has its own input loop, so entering
+     * it inside ah_handle would leave the ARexx sender waiting for a user. */
+    rexx_fullscreen = 1;
+}
+
 static const ah_cmd rexx_cmds[] = {
     { "OPEN", "FILE/A", rx_open },
     { "ADD", "FILE/A", rx_add },
@@ -2535,6 +2595,11 @@ static const ah_cmd rexx_cmds[] = {
     { "VOLUME", "LEVEL/N/A", rx_volume },
     { "GETFILE", "", rx_getfile },
     { "STATUS", "", rx_status },
+    { "SEEK", "POSITION/N/A", rx_seek },
+    { "GETPOSITION", "", rx_getposition },
+    { "GETDURATION", "", rx_getduration },
+    { "GETINFO", "", rx_getinfo },
+    { "FULLSCREEN", "", rx_fullscreen },
     { NULL, NULL, NULL }
 };
 
@@ -2609,6 +2674,10 @@ static int op_main(void)
         if (got & ah_sigmask(rexx)) {
             ah_handle(rexx);
             if (rexx_quit) quit = 1;
+            if (!quit && rexx_fullscreen) {
+                rexx_fullscreen = 0;
+                full_screen();
+            }
         }
         while (!quit && win && (m = GT_GetIMsg(win->UserPort)))
             quit = main_event(m);

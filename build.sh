@@ -23,7 +23,7 @@ SOFT="-specs=$HERE/specs/m68k-soft-m68040.specs"
 FLAGS="-noixemul -m68040 $SOFT -std=gnu99 -Wall -Werror -O2 -fno-tree-loop-distribute-patterns -fno-delete-null-pointer-checks -fno-common -I$HERE/app -I$OGT -I$HERE/third_party/gfopensdk"
 # shellcheck disable=SC2086
 "$CC" $FLAGS -o "$OUT/GFOpenPlay" \
-    "$HERE/app/openplay.c" "$HERE/app/op_icons.c" "$HERE/app/op_stack.c" \
+    "$HERE/app/openplay.c" "$HERE/app/op_icons.c" "$HERE/app/op_stack.c" "$HERE/app/op_media_control.c" \
     "$OGT/ogt_theme.c" "$OGT/ogt_draw.c" "$OGT/ogt_icons.c" "$OGT/ogt_list.c" \
     "$OGT/ogt_toolbar.c" "$OGT/ogt_font.c"
 mkdir -p "$OUT/Rexx" && cp "$HERE"/Rexx/*.rexx "$OUT/Rexx/"   # the ARexx examples

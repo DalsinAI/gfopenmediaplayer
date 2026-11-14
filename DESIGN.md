@@ -10,6 +10,12 @@ itself: the datatypes do (gfopenimage's gfopenpicture, gfopensound, gfopenvideo,
 webp and webm, and the OS's own). So the player stays small, and every new
 datatype is a new format for it.
 
+The ARexx control plane also supplies the AkikoPlus-facing player commands
+that can be expressed through standard datatype state now: SEEK,
+GETPOSITION, GETDURATION, GETINFO and FULLSCREEN. AkikoPlus owns the choice
+of decode implementation; the player neither selects nor inspects a rung
+or route.
+
 | Kind | Group | What GFOpenPlay does |
 | --- | --- | --- |
 | Picture | GID_PICTURE | Shows it; Play is a slideshow, six seconds a picture |
