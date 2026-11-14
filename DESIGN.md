@@ -12,10 +12,9 @@ datatype is a new format for it.
 
 The ARexx control plane also supplies the AkikoPlus-facing player commands
 that can be expressed through standard datatype state now: SEEK,
-GETPOSITION, GETDURATION, GETINFO, GETPATH and FULLSCREEN. SETRUNG follows
-when the datatypes define an input attribute that reaches
-akikoplus.device; GFOpenPlay does not claim to switch a rung until that
-contract exists.
+GETPOSITION, GETDURATION, GETINFO and FULLSCREEN. AkikoPlus owns the choice
+of decode implementation; the player neither selects nor inspects a rung
+or route.
 
 | Kind | Group | What GFOpenPlay does |
 | --- | --- | --- |

@@ -16,7 +16,7 @@ drawers dropped on the window join the playlist; playlists save and open as
 .opl and .m3u.
 "About this file" says which datatype opened it and what decoded it.
 The GFOPENPLAY.1 ARexx port includes SEEK (milliseconds), GETPOSITION,
-GETDURATION, GETINFO, GETPATH and FULLSCREEN as well as OPEN, PLAY, PAUSE,
+GETDURATION, GETINFO and FULLSCREEN as well as OPEN, PLAY, PAUSE,
 STOP and VOLUME. HELP lists the exact templates.
 
 With the Open datatypes and a services card or a paired Cradle (the

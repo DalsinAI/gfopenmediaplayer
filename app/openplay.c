@@ -2470,7 +2470,6 @@ static void tooltypes(struct WBStartup *wb)
  *   SEEK POSITION/N/A   seek a film to POSITION milliseconds
  *   GETPOSITION, GETDURATION   RESULT: milliseconds
  *   GETINFO         RESULT: datatype, kind and decoder
- *   GETPATH         RESULT: the decoder/backend path the datatype reports
  *   FULLSCREEN      enter the current picture or film's full-screen view
  * and QUIT FORCE, ACTIVATE, DEACTIVATE (RC 5: no icon yet), VERSION, HELP,
  * FAULT. */
@@ -2576,18 +2575,6 @@ static void rx_getinfo(ah_call *c)
     ah_result(c, "DATATYPE %s KIND %s DECODER %s", dt_base[0] ? dt_base : "?", kind_word[kind], decoded_by());
 }
 
-static void rx_getpath(ah_call *c)
-{
-    STRPTR stats = NULL;
-    const char *by;
-    if (!dto) { ah_error(c, 5, 0); return; }
-    by = decoded_by();
-    if (GetDTAttrs(dto, OIA_Stats, (ULONG)&stats, TAG_DONE) && stats && *stats)
-        ah_result(c, "%s; %s", by, (const char *)stats);
-    else
-        ah_result(c, "%s", by);
-}
-
 static void rx_fullscreen(ah_call *c)
 {
     if (!dto || kind == K_SOUND) { ah_error(c, 5, 0); return; }
@@ -2612,7 +2599,6 @@ static const ah_cmd rexx_cmds[] = {
     { "GETPOSITION", "", rx_getposition },
     { "GETDURATION", "", rx_getduration },
     { "GETINFO", "", rx_getinfo },
-    { "GETPATH", "", rx_getpath },
     { "FULLSCREEN", "", rx_fullscreen },
     { NULL, NULL, NULL }
 };
