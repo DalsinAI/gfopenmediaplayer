@@ -72,7 +72,7 @@ GFOpenPlay has an ARexx port, `GFOPENPLAY.1`, on arexx.class (GFOpenSDK's `arexx
 | `GETPOSITION`, `GETDURATION` | RESULT: milliseconds for a sound or film; RC 5 when unknown |
 | `GETINFO` | RESULT: the datatype, media kind and decoder |
 | `GETPATH` | RESULT: the decoder/backend path and the datatype's measured stats when it supplies them |
-| `FULLSCREEN` | enter the current picture or film's full-screen view; returns when that view closes |
+| `FULLSCREEN` | enter the current picture or film's full-screen view after replying; no requester holds the ARexx sender |
 | `QUIT`, `ACTIVATE`, `VERSION`, `HELP`, `FAULT` | the standard commands (`DEACTIVATE` answers RC 5: no icon yet) |
 
 `tests/arexx.rexx FILE` exercises the non-modal control path against a

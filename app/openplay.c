@@ -2478,6 +2478,7 @@ static void tooltypes(struct WBStartup *wb)
 
 static ah_host *rexx;
 static int rexx_quit;
+static int rexx_fullscreen;
 
 static int rx_exists(ah_call *c)
 {
@@ -2590,7 +2591,9 @@ static void rx_getpath(ah_call *c)
 static void rx_fullscreen(ah_call *c)
 {
     if (!dto || kind == K_SOUND) { ah_error(c, 5, 0); return; }
-    full_screen();
+    /* Reply first. The full-screen view has its own input loop, so entering
+     * it inside ah_handle would leave the ARexx sender waiting for a user. */
+    rexx_fullscreen = 1;
 }
 
 static const ah_cmd rexx_cmds[] = {
@@ -2685,6 +2688,10 @@ static int op_main(void)
         if (got & ah_sigmask(rexx)) {
             ah_handle(rexx);
             if (rexx_quit) quit = 1;
+            if (!quit && rexx_fullscreen) {
+                rexx_fullscreen = 0;
+                full_screen();
+            }
         }
         while (!quit && win && (m = GT_GetIMsg(win->UserPort)))
             quit = main_event(m);
