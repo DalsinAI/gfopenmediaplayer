@@ -213,6 +213,7 @@ static int env_w;
 static LONG snd_done;                   /* ticks (1/50 s) played before the last start */
 static struct DateStamp t_snd;          /* the last start */
 static int snd_running;
+static int snd_ended;                 /* a sound ran to its end by itself: the playlist moves on */
 static struct { int x, y, w, h; } scope_box, over_box;
 static int win_box[4];              /* the place last remembered */
 
@@ -691,7 +692,7 @@ static LONG ticks_since_ds(const struct DateStamp *a)
 
 static void snd_started(void) { DateStamp(&t_snd); snd_running = 1; }
 static void snd_paused(void) { if (snd_running) snd_done += ticks_since_ds(&t_snd); snd_running = 0; }
-static void snd_reset(void) { snd_done = 0; snd_running = 0; }
+static void snd_reset(void) { snd_done = 0; snd_running = 0; snd_ended = 0; }
 
 /* The sample playing now (0 when not known), with Repeat going round. */
 static ULONG snd_pos(void)
@@ -702,7 +703,7 @@ static ULONG snd_pos(void)
     p = (ULONG)(((unsigned long long)t * snd_rate) / 50);
     if (p >= snd_len) {
         if (repeat_on) p %= snd_len;
-        else { p = snd_len; if (snd_running) { snd_paused(); playing = 0; } }
+        else { p = snd_len; if (snd_running) { snd_paused(); playing = 0; snd_ended = 1; } }
     }
     return p;
 }
@@ -2319,6 +2320,11 @@ static int main_event(struct IntuiMessage *m)
         if (kind == K_SOUND && snd_running) {
             if (show_scope || show_overview) draw_sound_views();
             draw_seek();
+        }
+        if (snd_ended) {                   /* as a film does at its last frame: on to the next item */
+            snd_ended = 0;
+            if (kind == K_SOUND && cur < nitems - 1) { step(1, 1); break; }
+            draw_tools();
         }
         if (playing && kind == K_PICTURE && ++slide_ticks >= SLIDE_TICKS) {
             slide_ticks = 0;
