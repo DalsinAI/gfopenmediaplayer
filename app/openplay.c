@@ -72,7 +72,7 @@
 #include "op_icons.h"
 #include "op_rtg.h"
 
-#define VERSION_TEXT "GFOpenPlay 0.1.7 (17.11.2026)"
+#define VERSION_TEXT "GFOpenPlay 0.1.8 (17.11.2026)"
 static const char version[] __attribute__((used)) = "$VER: " VERSION_TEXT " MIT, Copyright (c) 2026 AmiCradle Team";
 
 struct Library *DataTypesBase, *AslBase, *IFFParseBase, *IconBase, *WorkbenchBase;
@@ -2495,6 +2495,7 @@ static void rx_open(ah_call *c)
     if (!rx_exists(c)) return;
     command(C_CLEAR);
     add_path(ah_str(c, 0));
+    if (list) ogt_list_set_count(list, nitems);     /* 0.1.8: the panel said "4 items" over an empty list */
     if (nitems) show_item(0, 1);
     else ah_error(c, 10, 0);
     draw_all();
