@@ -2291,6 +2291,10 @@ static void info_window(void)
  * "does not return from full screen and crashes"). The object is stopped before it moves, both ways. */
 /* An ACMedia film on a screen of its own (0.2.0): the whole screen is its box, kept to the film's shape; the
  * host scales it there. Space pauses; Esc, F or a click comes back. */
+#include <arexx/apphost.h>
+static ah_host *rexx;                       /* GFOpenPlay's ARexx port (moved up: full screen watches it) */
+static int rexx_quit;
+static int want_full;                       /* FULLSCREEN over ARexx: started by the main loop, after the reply */
 static void am_full_screen(void)
 {
     struct Screen *fs;
@@ -2323,8 +2327,11 @@ static void am_full_screen(void)
     while (!done) {
         struct IntuiMessage *m;
         ULONG tick_sig = tick_port ? 1UL << tick_port->mp_SigBit : 0;
-        ULONG got = Wait((1UL << fw->UserPort->mp_SigBit) | tick_sig | SIGBREAKF_CTRL_C);
+        ULONG got = Wait((1UL << fw->UserPort->mp_SigBit) | tick_sig | SIGBREAKF_CTRL_C | ah_sigmask(rexx));
         if (got & SIGBREAKF_CTRL_C) done = 1;
+        /* An ARexx message ends full screen, and the main loop answers it (22 Nov 2026: a QUIT sent while a
+         * film was full screen waited for good); its signal is raised again for that loop. */
+        if (got & ah_sigmask(rexx)) { done = 1; SetSignal(ah_sigmask(rexx), ah_sigmask(rexx)); }
         if ((got & tick_sig) && tick_out && CheckIO((struct IORequest *)tick_req)) {
             WaitIO((struct IORequest *)tick_req);
             tick_out = 0;
@@ -2909,12 +2916,11 @@ static void tooltypes(struct WBStartup *wb)
  *   GETFILE         RESULT: the item being shown ("" when none)
  *   STATUS          RESULT: PLAYING or STOPPED, the item's number from 1,
  *                   the number of items ("PLAYING 2 5")
+ *   FULLSCREEN      the item on a screen of its own (0.2.0): replied at once,
+ *                   left with Esc, F, a click or any ARexx message
  * and QUIT FORCE, ACTIVATE, DEACTIVATE (RC 5: no icon yet), VERSION, HELP,
- * FAULT. */
-#include <arexx/apphost.h>
+ * FAULT. (arexx/apphost.h is included above, before full screen, which watches the port.) */
 
-static ah_host *rexx;
-static int rexx_quit;
 
 static int rx_exists(ah_call *c)
 {
@@ -2955,7 +2961,7 @@ static void rx_stop(ah_call *c) { (void)c; stop(); }
 static void rx_next(ah_call *c) { (void)c; command(C_NEXT); }
 static void rx_prev(ah_call *c) { (void)c; command(C_PREV); }
 static void rx_clear(ah_call *c) { (void)c; command(C_CLEAR); }
-static void rx_full(ah_call *c) { (void)c; command(C_FULL); }   /* 0.2.0: back when it is left (Esc, F, a click) */
+static void rx_full(ah_call *c) { (void)c; want_full = 1; }   /* 0.2.0: replied at once; the main loop goes full screen */
 static void rx_volume(ah_call *c) { set_volume((int)ah_num(c, 0, volume)); }
 
 static void rx_getfile(ah_call *c)
@@ -2980,7 +2986,7 @@ static const ah_cmd rexx_cmds[] = {
     { "VOLUME", "LEVEL/N/A", rx_volume },
     { "GETFILE", "", rx_getfile },
     { "STATUS", "", rx_status },
-    { "FULLSCREEN", "", rx_full },
+    { "FULLSCREEN", "", rx_full },   /* 0.2.0 */
     { NULL, NULL, NULL }
 };
 
@@ -3057,6 +3063,7 @@ static int op_main(void)
             ah_handle(rexx);
             if (rexx_quit) quit = 1;
         }
+        if (want_full && !quit) { want_full = 0; command(C_FULL); }
         while (!quit && win && (m = GT_GetIMsg(win->UserPort)))
             quit = main_event(m);
         if (!win) break;
