@@ -247,6 +247,7 @@ static struct timerequest *tick_req;
 static int tick_out;
 static void film_present(void);
 static int am_on;                           /* a film open through ACMedia (0.2.0) */
+static void am_present(void);
 static int kind, playing, frames, frame, fps, slide_ticks, hover = -1, pending_play, pending_ticks;
 static ULONG pic_w, pic_h, snd_len, snd_rate;
 static ULONG vid_w, vid_h;                  /* a film in the window: its size, to put it in the middle (0.1.9) */
