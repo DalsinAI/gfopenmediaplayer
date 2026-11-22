@@ -30,6 +30,7 @@ struct OpAkikoMedia {
 #define APMCMD_FRAME      (CMD_NONSTD + 9)
 #define APMSF_EXACT 0x10
 #define APMCTL_SETRECT   8
+#define APMCTL_AVDELAY   11   /* A: ms the pictures wait for the sound (0-2000) */
 
 #define APMA_Dummy        (TAG_USER + 0x41500000)
 #define APMA_Name         (APMA_Dummy + 1)

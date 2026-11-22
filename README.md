@@ -48,7 +48,13 @@ Built for the 68040, integer maths only. GFOpenUp installs it as a part
 
 ## Using it
 
-    GFOpenPlay [FILES ...] [BUTTONS=ICONS|TEXT|BOTH] [OWNSCREEN]
+    GFOpenPlay [FILES ...] [BUTTONS=ICONS|TEXT|BOTH] [OWNSCREEN] [AVDELAY=ms]
+
+The icon's ToolTypes take the same: `BUTTONS=`, `OWNSCREEN` and `AVDELAY=`.
+`AVDELAY` (0.2.1) is how many milliseconds a film's pictures wait for its sound,
+0 to 2000, for the time the sound takes to reach the speakers. Without it the
+machine's own figure is used (its hardware template's `AC_ACMEDIA_AV_MS`).
+Pictures ahead of the sound: make it larger; behind: smaller.
 
 From Workbench: double-click it, shift-click files with it, or drop files on
 its window. Keys: O open, P or Space play/pause, T or Esc stop, V and N (or

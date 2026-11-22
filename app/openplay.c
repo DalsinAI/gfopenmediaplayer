@@ -72,7 +72,7 @@
 #include "op_icons.h"
 #include "op_rtg.h"
 
-#define VERSION_TEXT "GFOpenPlay 0.2.0 (22.11.2026)"
+#define VERSION_TEXT "GFOpenPlay 0.2.1 (22.11.2026)"
 static const char version[] __attribute__((used)) = "$VER: " VERSION_TEXT " MIT, Copyright (c) 2026 AmiCradle Team";
 
 struct Library *DataTypesBase, *AslBase, *IFFParseBase, *IconBase, *WorkbenchBase;
@@ -247,6 +247,9 @@ static struct timerequest *tick_req;
 static int tick_out;
 static void film_present(void);
 static int am_on;                           /* a film open through ACMedia (0.2.0) */
+/* AVDELAY (0.2.1, the icon's ToolType or AVDELAY=): how many ms the pictures wait for the sound, for the time the
+ * sound takes to reach the speakers (the AHI buffers and the host's). -1: the machine's own (its hardware template). */
+static LONG av_delay = -1;
 static void am_present(void);
 static int am_full;                         /* on a screen of its own (am_full_screen) */
 static int kind, playing, frames, frame, fps, slide_ticks, hover = -1, pending_play, pending_ticks;
@@ -1514,6 +1517,13 @@ static int am_open(const char *path)
     snprintf(dt_name, sizeof dt_name, "film");
     snprintf(dt_base, sizeof dt_base, "akikoplus.device");
     am_rect();
+    if (av_delay >= 0) {
+        struct TagItem t[2];
+        t[0].ti_Tag = APMA_ControlA; t[0].ti_Data = (ULONG)av_delay;
+        t[1].ti_Tag = TAG_DONE;
+        am_io->iam_Req.io_Offset = APMCTL_AVDELAY;
+        if (am_do(APMCMD_CONTROL, NULL, 0, t)) dbg("acmedia: AVDELAY %ld not taken (an older host)", (long)av_delay);
+    }
     dbg("acmedia: %s opened, %lu x %lu, %ld ms, sound %lu Hz%s", path, (unsigned long)am_fw, (unsigned long)am_fh, (long)am_dur,
         (unsigned long)am_rate, ahi_open ? "" : " (no AHI)");
     return 1;
@@ -2889,6 +2899,15 @@ static void app_news(void)
 
 /* ---- start ---- */
 
+/* AVDELAY's ms: 0-2000, else the machine's own */
+static LONG parse_avdelay(const char *v)
+{
+    LONG n = 0;
+    if (!v || *v < '0' || *v > '9') return -1;
+    while (*v >= '0' && *v <= '9' && n <= 2000) n = n * 10 + (*v++ - '0');
+    return n <= 2000 ? n : -1;
+}
+
 static void tooltypes(struct WBStartup *wb)
 {
     struct DiskObject *dob;
@@ -2899,6 +2918,7 @@ static void tooltypes(struct WBStartup *wb)
     if ((dob = GetDiskObject((CONST_STRPTR)wb->sm_ArgList[0].wa_Name))) {
         if ((v = FindToolType((CONST_STRPTR *)dob->do_ToolTypes, (CONST_STRPTR)"BUTTONS"))) bt_forced = parse_buttons((char *)v);
         if (FindToolType((CONST_STRPTR *)dob->do_ToolTypes, (CONST_STRPTR)"OWNSCREEN")) want_own = 1;
+        if ((v = FindToolType((CONST_STRPTR *)dob->do_ToolTypes, (CONST_STRPTR)"AVDELAY"))) av_delay = parse_avdelay((const char *)v);
         FreeDiskObject(dob);
     }
     CurrentDir(old);
@@ -3011,7 +3031,7 @@ static const ah_hooks rexx_hooks = { VERSION_TEXT, rx_quit_hook, rx_front_hook, 
 
 static int op_main(void)
 {
-    LONG args[3] = { 0, 0, 0 };
+    LONG args[4] = { 0, 0, 0, 0 };
     struct RDArgs *rda = NULL;
     int quit = 0, rc = RETURN_FAIL, i;
 
@@ -3034,10 +3054,11 @@ static int op_main(void)
         tooltypes(_WBenchMsg);
         for (i = 1; i < _WBenchMsg->sm_NumArgs; i++)
             add_lock(_WBenchMsg->sm_ArgList[i].wa_Lock, (const char *)_WBenchMsg->sm_ArgList[i].wa_Name);
-    } else if ((rda = ReadArgs((CONST_STRPTR)"FILES/M,BUTTONS/K,OWNSCREEN/S", args, NULL))) {
+    } else if ((rda = ReadArgs((CONST_STRPTR)"FILES/M,BUTTONS/K,OWNSCREEN/S,AVDELAY/K", args, NULL))) {
         if (args[0]) { char **f = (char **)args[0]; while (*f) add_path(*f++); }
         if (args[1]) bt_forced = parse_buttons((const char *)args[1]);
         if (args[2]) want_own = 1;
+        if (args[3]) av_delay = parse_avdelay((const char *)args[3]);
     }
     appport = CreateMsgPort();
     if (!open_ui()) goto out;
