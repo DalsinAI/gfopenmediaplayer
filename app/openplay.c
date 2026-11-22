@@ -248,6 +248,7 @@ static int tick_out;
 static void film_present(void);
 static int am_on;                           /* a film open through ACMedia (0.2.0) */
 static void am_present(void);
+static int am_full;                         /* on a screen of its own (am_full_screen) */
 static int kind, playing, frames, frame, fps, slide_ticks, hover = -1, pending_play, pending_ticks;
 static ULONG pic_w, pic_h, snd_len, snd_rate;
 static ULONG vid_w, vid_h;                  /* a film in the window: its size, to put it in the middle (0.1.9) */
@@ -946,7 +947,7 @@ static void draw_tools(void)
     ogt_toolbar_enable(&tb, C_NEXT, nitems > 1);
     ogt_toolbar_enable(&tb, C_PLAY, nitems > 0);
     ogt_toolbar_enable(&tb, C_STOP, dto != NULL || am_on);
-    ogt_toolbar_enable(&tb, C_FULL, dto != NULL && kind != K_SOUND);
+    ogt_toolbar_enable(&tb, C_FULL, (dto != NULL && kind != K_SOUND) || am_on);
     ogt_toolbar_enable(&tb, C_INFO, dto != NULL);
     ogt_toolbar_enable(&tb, C_CDXL, dto != NULL && kind == K_VIDEO);
     ogt_fill(&ctx, win->RPort, "window", win->BorderLeft, tb_y, win->Width - win->BorderLeft - win->BorderRight, tb.h);
@@ -1312,8 +1313,11 @@ static LONG am_do(UWORD cmd, APTR data, ULONG len, struct TagItem *tags)
     am_io->iam_Req.io_Data = data;
     am_io->iam_Req.io_Length = len;
     am_io->iam_Req.io_Flags = 0;
+    LONG r;
     am_io->iam_Tags = tags;
-    return DoIO((struct IORequest *)am_io);
+    r = DoIO((struct IORequest *)am_io);
+    am_io->iam_Tags = NULL;                 /* the tags are the caller's, on its stack */
+    return r;
 }
 
 /* INFO: the state, position, size, route and the sound's rate */
@@ -1557,6 +1561,10 @@ static void am_tick(void)
         am_info();
         if (was != am_plane) am_rect();          /* the plane came or went (the window covered, another monitor) */
         frame = (int)(am_pos / 40);
+        if (am_full) {                       /* on a screen of its own: no slider there; the end ends it */
+            if (am_state == OPA_STATE_ENDED && playing && repeat_on) { am_seek(0); am_play(1); }
+            return;
+        }
         draw_seek();
         if (am_state == OPA_STATE_ENDED && playing) {
             if (repeat_on) { am_seek(0); am_play(1); }
@@ -2281,8 +2289,75 @@ static void info_window(void)
  * 0.1.3: the window's own datatype object moves to the full-screen window and back, rather than a
  * second object of the same file beside it (two decoders of one film: the user, 10 October 2026,
  * "does not return from full screen and crashes"). The object is stopped before it moves, both ways. */
+/* An ACMedia film on a screen of its own (0.2.0): the whole screen is its box, kept to the film's shape; the
+ * host scales it there. Space pauses; Esc, F or a click comes back. */
+static void am_full_screen(void)
+{
+    struct Screen *fs;
+    struct Window *fw, *keep_win = win;
+    int done = 0, keep_view = view_mode;
+    ULONG fpen;
+    struct { int x, y, w, h; } keep_box;
+    if (!(fs = OpenScreenTags(NULL, SA_LikeWorkbench, TRUE, SA_Title, (ULONG)"GFOpenPlay", SA_ShowTitle, FALSE,
+                              SA_Quiet, TRUE, SA_Type, CUSTOMSCREEN, TAG_DONE))) {
+        set_status("There isn't memory for a screen of its own. Close something and try again.");
+        return;
+    }
+    if (!(fw = OpenWindowTags(NULL, WA_CustomScreen, (ULONG)fs, WA_Left, 0, WA_Top, 0, WA_Width, fs->Width, WA_Height, fs->Height,
+                              WA_Borderless, TRUE, WA_Backdrop, TRUE, WA_Activate, TRUE, WA_RMBTrap, TRUE,
+                              WA_IDCMP, IDCMP_VANILLAKEY | IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY, TAG_DONE))) {
+        CloseScreen(fs);
+        return;
+    }
+    fpen = ObtainBestPen(fs->ViewPort.ColorMap, 0, 0, 0, OBP_Precision, PRECISION_EXACT, TAG_DONE);
+    SetAPen(fw->RPort, fpen);
+    RectFill(fw->RPort, 0, 0, fs->Width - 1, fs->Height - 1);
+    memcpy(&keep_box, &media_box, sizeof keep_box);
+    win = fw;
+    media_box.x = 0; media_box.y = 0; media_box.w = fs->Width; media_box.h = fs->Height;
+    if (view_mode == VIEW_ONE) view_mode = VIEW_FIT;
+    am_full = 1;
+    am_rect();
+    am_present();
+    tick_start();
+    while (!done) {
+        struct IntuiMessage *m;
+        ULONG tick_sig = tick_port ? 1UL << tick_port->mp_SigBit : 0;
+        ULONG got = Wait((1UL << fw->UserPort->mp_SigBit) | tick_sig | SIGBREAKF_CTRL_C);
+        if (got & SIGBREAKF_CTRL_C) done = 1;
+        if ((got & tick_sig) && tick_out && CheckIO((struct IORequest *)tick_req)) {
+            WaitIO((struct IORequest *)tick_req);
+            tick_out = 0;
+            am_tick();
+            if (!am_on || (am_state == OPA_STATE_ENDED && !repeat_on)) done = 1;
+            else tick_start();
+        }
+        while ((m = (struct IntuiMessage *)GetMsg(fw->UserPort))) {
+            ULONG cl = m->Class;
+            UWORD code = m->Code;
+            ReplyMsg((struct Message *)m);
+            if (cl == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) done = 1;
+            else if (cl == IDCMP_VANILLAKEY && (code == 27 || code == 'f' || code == 'F')) done = 1;
+            else if (cl == IDCMP_RAWKEY && code == 0x45) done = 1;
+            else if (cl == IDCMP_VANILLAKEY && code == ' ') { playing = !playing; am_play(playing); }
+        }
+    }
+    am_full = 0;
+    win = keep_win;
+    memcpy(&media_box, &keep_box, sizeof keep_box);
+    view_mode = keep_view;
+    ReleasePen(fs->ViewPort.ColorMap, fpen);
+    CloseWindow(fw);
+    CloseScreen(fs);
+    am_drawn = 0;
+    am_rect();
+    draw_all();
+    tick_start();
+}
+
 static void full_screen(void)
 {
+    if (am_on) { am_full_screen(); return; }
     struct Screen *fs;
     struct Window *fw;
     int done = 0, was_playing = playing && kind == K_VIDEO;
@@ -2880,6 +2955,7 @@ static void rx_stop(ah_call *c) { (void)c; stop(); }
 static void rx_next(ah_call *c) { (void)c; command(C_NEXT); }
 static void rx_prev(ah_call *c) { (void)c; command(C_PREV); }
 static void rx_clear(ah_call *c) { (void)c; command(C_CLEAR); }
+static void rx_full(ah_call *c) { (void)c; command(C_FULL); }   /* 0.2.0: back when it is left (Esc, F, a click) */
 static void rx_volume(ah_call *c) { set_volume((int)ah_num(c, 0, volume)); }
 
 static void rx_getfile(ah_call *c)
@@ -2904,6 +2980,7 @@ static const ah_cmd rexx_cmds[] = {
     { "VOLUME", "LEVEL/N/A", rx_volume },
     { "GETFILE", "", rx_getfile },
     { "STATUS", "", rx_status },
+    { "FULLSCREEN", "", rx_full },
     { NULL, NULL, NULL }
 };
 
