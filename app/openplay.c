@@ -72,7 +72,7 @@
 #include "op_icons.h"
 #include "op_rtg.h"
 
-#define VERSION_TEXT "GFOpenPlay 0.1.9 (22.11.2026)"
+#define VERSION_TEXT "GFOpenPlay 0.2.1 (22.11.2026)"
 static const char version[] __attribute__((used)) = "$VER: " VERSION_TEXT " MIT, Copyright (c) 2026 AmiCradle Team";
 
 struct Library *DataTypesBase, *AslBase, *IFFParseBase, *IconBase, *WorkbenchBase;
@@ -246,6 +246,12 @@ static struct MsgPort *tick_port;           /* timer.device: GFOpenPlay looks fo
 static struct timerequest *tick_req;
 static int tick_out;
 static void film_present(void);
+static int am_on;                           /* a film open through ACMedia (0.2.0) */
+/* AVDELAY (0.2.1, the icon's ToolType or AVDELAY=): how many ms the pictures wait for the sound, for the time the
+ * sound takes to reach the speakers (the AHI buffers and the host's). -1: the machine's own (its hardware template). */
+static LONG av_delay = -1;
+static void am_present(void);
+static int am_full;                         /* on a screen of its own (am_full_screen) */
 static int kind, playing, frames, frame, fps, slide_ticks, hover = -1, pending_play, pending_ticks;
 static ULONG pic_w, pic_h, snd_len, snd_rate;
 static ULONG vid_w, vid_h;                  /* a film in the window: its size, to put it in the middle (0.1.9) */
@@ -902,6 +908,7 @@ static void draw_media_back(void)
     struct RastPort *rp = win->RPort;
     ogt_rgb black = {0, 0, 0};
     ogt_frame(rp, pen("string.shadow"), media_box.x - 1, media_box.y - 1, media_box.w + 2, media_box.h + 2);
+    if (am_on) { ogt_box(rp, ogt_pen_rgb(&ctx, black), media_box.x, media_box.y, media_box.w, media_box.h); return; }
     if (dto) {
         /* a picture smaller than the box sits in its middle on black */
         if (kind == K_PICTURE || (kind == K_VIDEO && film_win)) { ogt_rgb black0 = {0, 0, 0}; ogt_box(rp, ogt_pen_rgb(&ctx, black0), media_box.x, media_box.y, media_box.w, media_box.h); }
@@ -942,8 +949,8 @@ static void draw_tools(void)
     ogt_toolbar_enable(&tb, C_PREV, nitems > 1);
     ogt_toolbar_enable(&tb, C_NEXT, nitems > 1);
     ogt_toolbar_enable(&tb, C_PLAY, nitems > 0);
-    ogt_toolbar_enable(&tb, C_STOP, dto != NULL);
-    ogt_toolbar_enable(&tb, C_FULL, dto != NULL && kind != K_SOUND);
+    ogt_toolbar_enable(&tb, C_STOP, dto != NULL || am_on);
+    ogt_toolbar_enable(&tb, C_FULL, (dto != NULL && kind != K_SOUND) || am_on);
     ogt_toolbar_enable(&tb, C_INFO, dto != NULL);
     ogt_toolbar_enable(&tb, C_CDXL, dto != NULL && kind == K_VIDEO);
     ogt_fill(&ctx, win->RPort, "window", win->BorderLeft, tb_y, win->Width - win->BorderLeft - win->BorderRight, tb.h);
@@ -969,6 +976,7 @@ static void draw_all(void)
     GT_RefreshWindow(win, NULL);
     if (dto && dto_in == win) RefreshDTObjects(dto, win, NULL, TAG_DONE);
     else if (dto && dto_in == film_win) film_present();
+    else if (am_on) am_present();
 }
 
 /* ---- a film starting ---- */
@@ -1033,7 +1041,7 @@ static void film_settle(void)
 static void tick_start(void)
 {
     LONG rate;
-    if (!tick_req || tick_out || !film_win) return;
+    if (!tick_req || tick_out || (!film_win && !am_on)) return;
     rate = fps > 0 ? 2 * fps : 50;          /* twice a frame: drawn when the frame changes, and once after */
     if (rate > 60) rate = 60;
     if (rate < 10) rate = 10;
@@ -1253,6 +1261,329 @@ static void film_tick(void)
     }
 }
 
+/* ---- films through ACMedia (0.2.0) ----
+ *
+ * The user, 22 November 2026: films "should auto stretch to fit the window", "keeping its aspect", and
+ * media decode "exposed via akiko and mitchy". A film whose name says film goes first to akikoplus.device
+ * (AkikoPlus, ACMedia): the host decodes it (the x86 appliance's Radeon through VA-API, the Pis on the CPU
+ * or the Pi 5's HEVC block) at any size, and its picture is either on acscreen's overlay plane over the
+ * window's box (the Pis: no pixel of it through the 68k) or, where there is no plane (the x86's Radeon has
+ * none), pulled at the box's size as ARGB32, scaled on the host, and drawn with ORTG_WritePixels. Its sound
+ * comes the same way, native-rate 16-bit stereo, to ahi.device. The box keeps the film's shape (Fit), or
+ * Actual size or Fill as the View menu says. Where akikoplus.device isn't there, or can't open the film
+ * (another drive, a codec the host lacks), the datatype plays it as before. */
+#include "op_acmedia.h"
+#include <devices/ahi.h>
+
+#define AM_AHI_BYTES 16384
+static struct MsgPort *am_port;
+static struct OpAkikoMedia *am_io;
+static int am_plane;                        /* its picture on the overlay plane (else GFOpenPlay draws it) */
+static int am_hw;                           /* decoded by a hardware decoder (VA-API) */
+static LONG am_dur, am_pos, am_state;
+static ULONG am_fw, am_fh, am_rate;
+static UBYTE *am_buf;                       /* the frame GFOpenPlay draws: am_dw x am_dh ARGB32 */
+static ULONG am_buflen;
+static LONG am_dx, am_dy, am_dw, am_dh;     /* the picture's place in the window */
+static int am_drawn;                        /* am_buf holds a frame */
+static int am_slow;                         /* ticks since the slider was drawn */
+static struct MsgPort *ahi_port;
+static struct AHIRequest *ahi_req[2];
+static UBYTE *ahi_buf[2];
+static int ahi_open, ahi_busy[2], ahi_last = -1;
+
+static void step(int d, int play);
+
+static ULONG am_be(const UBYTE *p) { return (ULONG)p[0] << 24 | (ULONG)p[1] << 16 | (ULONG)p[2] << 8 | p[3]; }
+
+static int am_film_name(const char *path)
+{
+    static const char *const ends[] = { ".mp4", ".m4v", ".mkv", ".webm", ".mov", ".avi", ".mpg", ".mpeg", ".ts", ".m2ts",
+                                        ".flv", ".wmv", ".ogv", ".3gp", NULL };
+    char low[16];
+    const char *dot = strrchr(path, '.');
+    int i;
+    if (!dot || strlen(dot) >= sizeof low) return 0;
+    for (i = 0; dot[i]; i++) low[i] = dot[i] >= 'A' && dot[i] <= 'Z' ? dot[i] + 32 : dot[i];
+    low[i] = 0;
+    for (i = 0; ends[i]; i++) if (!strcmp(low, ends[i])) return 1;
+    return 0;
+}
+
+static LONG am_do(UWORD cmd, APTR data, ULONG len, struct TagItem *tags)
+{
+    am_io->iam_Req.io_Command = cmd;
+    am_io->iam_Req.io_Data = data;
+    am_io->iam_Req.io_Length = len;
+    am_io->iam_Req.io_Flags = 0;
+    LONG r;
+    am_io->iam_Tags = tags;
+    r = DoIO((struct IORequest *)am_io);
+    am_io->iam_Tags = NULL;                 /* the tags are the caller's, on its stack */
+    return r;
+}
+
+/* INFO: the state, position, size, route and the sound's rate */
+static void am_info(void)
+{
+    static UBYTE info[4 * OPA_INFO_HEAD + 4 * 4 * OPA_STREAM];
+    LONG a;
+    if (am_do(APMCMD_INFO, info, sizeof info, NULL) || am_io->iam_Req.io_Actual < 4 * OPA_INFO_HEAD) return;
+    am_state = (LONG)am_be(info + 4 * OPA_IH_STATE);
+    am_pos = (LONG)am_be(info + 4 * OPA_IH_POSITION);
+    am_fw = am_be(info + 4 * OPA_IH_SIZE) >> 16;
+    am_fh = am_be(info + 4 * OPA_IH_SIZE) & 0xffff;
+    am_plane = am_be(info + 4 * OPA_IH_VROUTE) == OPA_ROUTE_PLANE;
+    am_hw = am_be(info + 4 * OPA_IH_VPATH) == OPA_PATH_VAAPI;
+    a = (LONG)am_be(info + 4 * OPA_IH_AUDIO);
+    if (a >= 0 && a < 4 && am_io->iam_Req.io_Actual >= 4 * (OPA_INFO_HEAD + (ULONG)(a + 1) * OPA_STREAM))
+        am_rate = am_be(info + 4 * (OPA_INFO_HEAD + a * OPA_STREAM + OPA_ST_RATE));
+}
+
+/* The picture's place in the media box, as view_mode says (film_rects' way, without the source cut: the
+ * host scales the whole frame; Fill keeps the box and lets the shape stretch no further than the box). */
+static void am_place(void)
+{
+    LONG bw = media_box.w, bh = media_box.h, tw = (LONG)am_fw, th = (LONG)am_fh;
+    if (am_fw && am_fh && bw > 0 && bh > 0) {
+        if (view_mode == VIEW_ONE) {
+            if (tw > bw) tw = bw;
+            if (th > bh) th = bh;
+        } else {
+            unsigned long long rw = ((unsigned long long)bw << 16) / am_fw, rh = ((unsigned long long)bh << 16) / am_fh;
+            unsigned long long r = view_mode == VIEW_FIT ? (rw < rh ? rw : rh) : (rw > rh ? rw : rh);
+            tw = (LONG)(((unsigned long long)am_fw * r) >> 16);
+            th = (LONG)(((unsigned long long)am_fh * r) >> 16);
+            if (tw > bw) tw = bw;
+            if (th > bh) th = bh;
+        }
+    } else { tw = bw; th = bh; }
+    if (tw < 2) tw = 2;
+    if (th < 2) th = 2;
+    am_dw = tw & ~1; am_dh = th & ~1;
+    am_dx = media_box.x + (bw - am_dw) / 2;
+    am_dy = media_box.y + (bh - am_dh) / 2;
+}
+
+/* Tell the host where the picture goes (the plane's box, on the screen), and size the pulled frame. */
+static void am_rect(void)
+{
+    struct TagItem t[5];
+    ULONG need;
+    if (!am_on || !win) return;
+    am_place();
+    t[0].ti_Tag = APMA_ControlA; t[0].ti_Data = (ULONG)((win->LeftEdge + am_dx) & 0xffff) << 16 | (ULONG)((win->TopEdge + am_dy) & 0xffff);
+    t[1].ti_Tag = APMA_ControlB; t[1].ti_Data = (ULONG)am_dw << 16 | (ULONG)am_dh;
+    t[2].ti_Tag = APMA_ControlC; t[2].ti_Data = 1;
+    t[3].ti_Tag = APMA_ControlD; t[3].ti_Data = 0;
+    t[4].ti_Tag = TAG_DONE;
+    am_io->iam_Req.io_Offset = APMCTL_SETRECT;
+    am_do(APMCMD_CONTROL, NULL, 0, t);
+    need = (ULONG)am_dw * (ULONG)am_dh * 4;
+    if (need != am_buflen) {
+        if (am_buf) FreeVec(am_buf);
+        am_buf = AllocVec(need, MEMF_ANY);
+        am_buflen = am_buf ? need : 0;
+        am_drawn = 0;
+    }
+    dbg("acmedia: %lu x %lu shown at %ld x %ld (%s)", (unsigned long)am_fw, (unsigned long)am_fh, (long)am_dw, (long)am_dh,
+        am_plane ? "overlay plane" : "drawn here");
+}
+
+static void am_present(void)
+{
+    struct OpenRTGPixels px;
+    if (!am_on || am_plane || !am_drawn || !am_buf || !OpenRTGBase || !win) return;
+    memset(&px, 0, sizeof px);
+    px.data = am_buf;
+    px.modulo = am_dw * 4;
+    px.format = ORTG_PIX_0RGB;
+    px.width = am_dw;
+    px.height = am_dh;
+    OP_ORTG_WritePixels(OpenRTGBase, win->RPort, am_dx, am_dy, &px);
+}
+
+/* The sound: whichever of the two AHI requests is free gets the next block, linked after the other. */
+static void am_sound(void)
+{
+    int i, n;
+    if (!ahi_open || !am_rate) return;
+    for (n = 0; n < 2; n++) {
+        i = -1;
+        if (!ahi_busy[0]) i = 0;
+        else if (!ahi_busy[1]) i = 1;
+        else {
+            if (CheckIO((struct IORequest *)ahi_req[0])) { WaitIO((struct IORequest *)ahi_req[0]); ahi_busy[0] = 0; i = 0; }
+            else if (CheckIO((struct IORequest *)ahi_req[1])) { WaitIO((struct IORequest *)ahi_req[1]); ahi_busy[1] = 0; i = 1; }
+        }
+        if (i < 0) return;
+        am_io->iam_Req.io_Command = CMD_READ;
+        am_io->iam_Req.io_Data = ahi_buf[i];
+        am_io->iam_Req.io_Length = AM_AHI_BYTES;
+        am_io->iam_Tags = NULL;
+        if (DoIO((struct IORequest *)am_io) || !am_io->iam_Req.io_Actual) return;
+        ahi_req[i]->ahir_Std.io_Command = CMD_WRITE;
+        ahi_req[i]->ahir_Std.io_Data = ahi_buf[i];
+        ahi_req[i]->ahir_Std.io_Length = am_io->iam_Req.io_Actual;
+        ahi_req[i]->ahir_Std.io_Offset = 0;
+        ahi_req[i]->ahir_Type = AHIST_S16S;
+        ahi_req[i]->ahir_Frequency = am_rate;
+        ahi_req[i]->ahir_Volume = (Fixed)volume * 1024;
+        ahi_req[i]->ahir_Position = 0x8000;
+        ahi_req[i]->ahir_Link = ahi_last >= 0 && ahi_busy[ahi_last] ? ahi_req[ahi_last] : NULL;
+        SendIO((struct IORequest *)ahi_req[i]);
+        ahi_busy[i] = 1;
+        ahi_last = i;
+    }
+}
+
+static void am_sound_stop(void)
+{
+    int i;
+    for (i = 0; i < 2; i++)
+        if (ahi_busy[i]) { AbortIO((struct IORequest *)ahi_req[i]); WaitIO((struct IORequest *)ahi_req[i]); ahi_busy[i] = 0; }
+    ahi_last = -1;
+}
+
+static void am_close(void)
+{
+    if (!am_port) return;
+    tick_stop();
+    am_sound_stop();
+    if (ahi_open) { CloseDevice((struct IORequest *)ahi_req[0]); ahi_open = 0; }
+    if (ahi_req[1]) { DeleteIORequest((struct IORequest *)ahi_req[1]); ahi_req[1] = NULL; }
+    if (ahi_req[0]) { DeleteIORequest((struct IORequest *)ahi_req[0]); ahi_req[0] = NULL; }
+    if (ahi_buf[0]) { FreeVec(ahi_buf[0]); ahi_buf[0] = ahi_buf[1] = NULL; }
+    if (ahi_port) { DeleteMsgPort(ahi_port); ahi_port = NULL; }
+    if (am_on) CloseDevice((struct IORequest *)am_io);
+    am_on = 0;
+    if (am_io) { DeleteIORequest((struct IORequest *)am_io); am_io = NULL; }
+    DeleteMsgPort(am_port);
+    am_port = NULL;
+    if (am_buf) { FreeVec(am_buf); am_buf = NULL; }
+    am_buflen = 0; am_drawn = 0; am_fw = am_fh = am_rate = 0; am_dur = am_pos = am_state = 0;
+}
+
+/* A film through ACMedia: 1 when it opened (kind is then K_VIDEO), 0 for the datatype. */
+static int am_open(const char *path)
+{
+    struct TagItem t[6];
+    char on[4];
+    if (!am_film_name(path) || !win) return 0;
+    if (GetVar((CONST_STRPTR)"OPENPLAY_ACMEDIA", (STRPTR)on, sizeof on, 0) > 0 && on[0] == '0') return 0;
+    if (!(am_port = CreateMsgPort())) return 0;
+    if (!(am_io = (struct OpAkikoMedia *)CreateIORequest(am_port, sizeof *am_io)) ||
+        OpenDevice((CONST_STRPTR)OP_AKIKOPLUS_NAME, 0, (struct IORequest *)am_io, 0)) {
+        dbg("acmedia: no %s", OP_AKIKOPLUS_NAME);
+        am_close();
+        return 0;
+    }
+    am_on = 1;
+    t[0].ti_Tag = APMA_Name;   t[0].ti_Data = (ULONG)path;
+    t[1].ti_Tag = APMA_Left;   t[1].ti_Data = (ULONG)(win->LeftEdge + media_box.x);
+    t[2].ti_Tag = APMA_Top;    t[2].ti_Data = (ULONG)(win->TopEdge + media_box.y);
+    t[3].ti_Tag = APMA_Width;  t[3].ti_Data = (ULONG)media_box.w;
+    t[4].ti_Tag = APMA_Height; t[4].ti_Data = (ULONG)media_box.h;
+    t[5].ti_Tag = TAG_DONE;
+    if (am_do(APMCMD_OPEN, NULL, 0, t) || !am_io->iam_Session) {
+        dbg("acmedia: OPEN %s: io_Error %d, fault %ld", path, (int)am_io->iam_Req.io_Error, (long)am_io->iam_Fault);
+        am_close();
+        return 0;
+    }
+    am_dur = am_io->iam_Result;
+    am_info();
+    if (!am_fw || !am_fh || (!am_plane && !OpenRTGBase)) {
+        dbg("acmedia: %s: no picture here (size %lu x %lu, plane %d)", path, (unsigned long)am_fw, (unsigned long)am_fh, am_plane);
+        am_close();
+        return 0;
+    }
+    /* the sound to ahi.device unit 0, when there is sound and AHI */
+    if (am_rate && (ahi_port = CreateMsgPort()) &&
+        (ahi_req[0] = (struct AHIRequest *)CreateIORequest(ahi_port, sizeof(struct AHIRequest))) &&
+        (ahi_req[1] = (struct AHIRequest *)CreateIORequest(ahi_port, sizeof(struct AHIRequest))) &&
+        (ahi_buf[0] = AllocVec(2 * AM_AHI_BYTES, MEMF_PUBLIC))) {
+        ahi_buf[1] = ahi_buf[0] + AM_AHI_BYTES;
+        ahi_req[0]->ahir_Version = 4;
+        if (!OpenDevice((CONST_STRPTR)AHINAME, 0, (struct IORequest *)ahi_req[0], 0)) {
+            *ahi_req[1] = *ahi_req[0];
+            ahi_open = 1;
+        }
+    }
+    kind = K_VIDEO;
+    fps = 25;                               /* the slider's steps: 40 ms */
+    frames = am_dur > 0 ? (int)(am_dur / 40) : 0;
+    frame = 0;
+    vid_w = am_fw; vid_h = am_fh;
+    snprintf(dt_name, sizeof dt_name, "film");
+    snprintf(dt_base, sizeof dt_base, "akikoplus.device");
+    am_rect();
+    if (av_delay >= 0) {
+        struct TagItem t[2];
+        t[0].ti_Tag = APMA_ControlA; t[0].ti_Data = (ULONG)av_delay;
+        t[1].ti_Tag = TAG_DONE;
+        am_io->iam_Req.io_Offset = APMCTL_AVDELAY;
+        if (am_do(APMCMD_CONTROL, NULL, 0, t)) dbg("acmedia: AVDELAY %ld not taken (an older host)", (long)av_delay);
+    }
+    dbg("acmedia: %s opened, %lu x %lu, %ld ms, sound %lu Hz%s", path, (unsigned long)am_fw, (unsigned long)am_fh, (long)am_dur,
+        (unsigned long)am_rate, ahi_open ? "" : " (no AHI)");
+    return 1;
+}
+
+static void am_play(int on)
+{
+    if (!am_on) return;
+    am_do(on ? CMD_START : CMD_STOP, NULL, 0, NULL);
+    if (!on) am_sound_stop();
+    tick_start();
+}
+
+static void am_seek(LONG ms)
+{
+    if (!am_on) return;
+    am_sound_stop();
+    am_io->iam_Req.io_Offset = (ULONG)(ms < 0 ? 0 : ms);
+    am_io->iam_Req.io_Command = APMCMD_SEEK;
+    am_io->iam_Req.io_Data = NULL;
+    am_io->iam_Req.io_Length = 0;
+    am_io->iam_Req.io_Flags = 0;
+    am_io->iam_Tags = NULL;
+    DoIO((struct IORequest *)am_io);
+}
+
+/* A tick: the newest frame drawn (no plane), the sound fed, the slider moved, and at the end on to the
+ * next item. */
+static void am_tick(void)
+{
+    struct TagItem t[5];
+    if (!am_on) return;
+    if (!am_plane && am_buf) {
+        t[0].ti_Tag = APMA_Width;       t[0].ti_Data = (ULONG)am_dw;
+        t[1].ti_Tag = APMA_Height;      t[1].ti_Data = (ULONG)am_dh;
+        t[2].ti_Tag = APMA_FramePitch;  t[2].ti_Data = (ULONG)am_dw * 4;
+        t[3].ti_Tag = APMA_FrameFormat; t[3].ti_Data = APMPIX_ARGB32;
+        t[4].ti_Tag = TAG_DONE;
+        if (!am_do(APMCMD_FRAME, am_buf, am_buflen, t)) { am_drawn = 1; am_present(); }
+    }
+    if (playing) am_sound();
+    if (++am_slow >= 10) {
+        int was = am_plane;
+        am_slow = 0;
+        am_info();
+        if (was != am_plane) am_rect();          /* the plane came or went (the window covered, another monitor) */
+        frame = (int)(am_pos / 40);
+        if (am_full) {                       /* on a screen of its own: no slider there; the end ends it */
+            if (am_state == OPA_STATE_ENDED && playing && repeat_on) { am_seek(0); am_play(1); }
+            return;
+        }
+        draw_seek();
+        if (am_state == OPA_STATE_ENDED && playing) {
+            if (repeat_on) { am_seek(0); am_play(1); }
+            else if (cur < nitems - 1) step(1, 1);
+            else { playing = 0; draw_tools(); }
+        }
+    }
+}
+
 /* ---- layout ---- */
 
 static void remove_gadgets(void)
@@ -1388,6 +1719,7 @@ static void layout(void)
         ogt_list_layout(list, 0, 0, 0, 0);
     }
     place_dto();
+    am_rect();
 }
 
 static void relayout_and_draw(void)
@@ -1400,6 +1732,7 @@ static void relayout_and_draw(void)
 
 static void close_media(void)
 {
+    am_close();
     if (dto) {
         film_settle();
         DoDTMethod(dto, DTWIN, NULL, DTM_TRIGGER, NULL, STM_STOP, NULL);
@@ -1461,6 +1794,12 @@ static const char *decoded_by(void)
 static void describe(void)
 {
     char what[80] = "";
+    if (am_on) {                            /* 0.2.0: through ACMedia */
+        snprintf(status, sizeof status, "ACMedia (akikoplus.device)  -  %lu x %lu, shown at %ld x %ld (%s, %s)  -  decoded on the host%s  -  opened in %s",
+                 (unsigned long)am_fw, (unsigned long)am_fh, (long)am_dw, (long)am_dh, view_word[view_mode],
+                 am_plane ? "overlay plane" : "drawn by GFOpenPlay", am_hw ? " by the graphics card (VA-API)" : "", opened_in);
+        return;
+    }
     if (kind == K_PICTURE && pic_w && scaled_w && (scaled_w != pic_w || scaled_h != pic_h))
         snprintf(what, sizeof what, "%lu x %lu, shown at %lu x %lu (%s)", (unsigned long)pic_w, (unsigned long)pic_h,
                  (unsigned long)scaled_w, (unsigned long)scaled_h, view_word[view_mode]);
@@ -1493,6 +1832,19 @@ static void show_item(int i, int play)
     SetWindowPointer(win, WA_BusyPointer, TRUE, TAG_DONE);
     DateStamp(&t_open);
     dbg("open %s", items[i].path);
+    if (am_open(items[i].path)) {
+        t = ticks_since(&t_open);
+        snprintf(opened_in, sizeof opened_in, "%d.%02d s", t / 50, (t % 50) * 2);
+        SetWindowPointer(win, TAG_DONE);
+        items[i].kind = K_VIDEO;
+        describe();
+        draw_all();
+        if (play) { playing = 1; am_play(1); }
+        draw_tools();
+        draw_seek();
+        if (list) ogt_list_draw(list);
+        return;
+    }
     dto = NewDTObject((APTR)items[i].path,
                       GA_Left, media_box.x, GA_Top, media_box.y, GA_Width, media_box.w, GA_Height, media_box.h,
                       GA_ID, GID_DT, ICA_TARGET, ICTARGET_IDCMP,
@@ -1600,6 +1952,12 @@ static void step(int d, int play)
 
 static void play_pause(void)
 {
+    if (am_on) {
+        playing = !playing;
+        am_play(playing);
+        draw_tools();
+        return;
+    }
     if (!dto) {
         show_item(cur >= 0 ? cur : 0, 1);
         return;
@@ -1619,6 +1977,7 @@ static void play_pause(void)
 static void stop(void)
 {
     if (dto && (kind == K_SOUND || kind == K_VIDEO)) DoDTMethod(dto, DTWIN, NULL, DTM_TRIGGER, NULL, STM_STOP, NULL);
+    if (am_on) { am_play(0); am_seek(0); }
     playing = 0;
     frame = 0;
     snd_reset();
@@ -1940,8 +2299,82 @@ static void info_window(void)
  * 0.1.3: the window's own datatype object moves to the full-screen window and back, rather than a
  * second object of the same file beside it (two decoders of one film: the user, 10 October 2026,
  * "does not return from full screen and crashes"). The object is stopped before it moves, both ways. */
+/* An ACMedia film on a screen of its own (0.2.0): the whole screen is its box, kept to the film's shape; the
+ * host scales it there. Space pauses; Esc, F or a click comes back. */
+#include <arexx/apphost.h>
+static ah_host *rexx;                       /* GFOpenPlay's ARexx port (moved up: full screen watches it) */
+static int rexx_quit;
+static int want_full;                       /* FULLSCREEN over ARexx: started by the main loop, after the reply */
+static void am_full_screen(void)
+{
+    struct Screen *fs;
+    struct Window *fw, *keep_win = win;
+    int done = 0, keep_view = view_mode;
+    ULONG fpen;
+    struct { int x, y, w, h; } keep_box;
+    if (!(fs = OpenScreenTags(NULL, SA_LikeWorkbench, TRUE, SA_Title, (ULONG)"GFOpenPlay", SA_ShowTitle, FALSE,
+                              SA_Quiet, TRUE, SA_Type, CUSTOMSCREEN, TAG_DONE))) {
+        set_status("There isn't memory for a screen of its own. Close something and try again.");
+        return;
+    }
+    if (!(fw = OpenWindowTags(NULL, WA_CustomScreen, (ULONG)fs, WA_Left, 0, WA_Top, 0, WA_Width, fs->Width, WA_Height, fs->Height,
+                              WA_Borderless, TRUE, WA_Backdrop, TRUE, WA_Activate, TRUE, WA_RMBTrap, TRUE,
+                              WA_IDCMP, IDCMP_VANILLAKEY | IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY, TAG_DONE))) {
+        CloseScreen(fs);
+        return;
+    }
+    fpen = ObtainBestPen(fs->ViewPort.ColorMap, 0, 0, 0, OBP_Precision, PRECISION_EXACT, TAG_DONE);
+    SetAPen(fw->RPort, fpen);
+    RectFill(fw->RPort, 0, 0, fs->Width - 1, fs->Height - 1);
+    memcpy(&keep_box, &media_box, sizeof keep_box);
+    win = fw;
+    media_box.x = 0; media_box.y = 0; media_box.w = fs->Width; media_box.h = fs->Height;
+    if (view_mode == VIEW_ONE) view_mode = VIEW_FIT;
+    am_full = 1;
+    am_rect();
+    am_present();
+    tick_start();
+    while (!done) {
+        struct IntuiMessage *m;
+        ULONG tick_sig = tick_port ? 1UL << tick_port->mp_SigBit : 0;
+        ULONG got = Wait((1UL << fw->UserPort->mp_SigBit) | tick_sig | SIGBREAKF_CTRL_C | ah_sigmask(rexx));
+        if (got & SIGBREAKF_CTRL_C) done = 1;
+        /* An ARexx message ends full screen, and the main loop answers it (22 Nov 2026: a QUIT sent while a
+         * film was full screen waited for good); its signal is raised again for that loop. */
+        if (got & ah_sigmask(rexx)) { done = 1; SetSignal(ah_sigmask(rexx), ah_sigmask(rexx)); }
+        if ((got & tick_sig) && tick_out && CheckIO((struct IORequest *)tick_req)) {
+            WaitIO((struct IORequest *)tick_req);
+            tick_out = 0;
+            am_tick();
+            if (!am_on || (am_state == OPA_STATE_ENDED && !repeat_on)) done = 1;
+            else tick_start();
+        }
+        while ((m = (struct IntuiMessage *)GetMsg(fw->UserPort))) {
+            ULONG cl = m->Class;
+            UWORD code = m->Code;
+            ReplyMsg((struct Message *)m);
+            if (cl == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) done = 1;
+            else if (cl == IDCMP_VANILLAKEY && (code == 27 || code == 'f' || code == 'F')) done = 1;
+            else if (cl == IDCMP_RAWKEY && code == 0x45) done = 1;
+            else if (cl == IDCMP_VANILLAKEY && code == ' ') { playing = !playing; am_play(playing); }
+        }
+    }
+    am_full = 0;
+    win = keep_win;
+    memcpy(&media_box, &keep_box, sizeof keep_box);
+    view_mode = keep_view;
+    ReleasePen(fs->ViewPort.ColorMap, fpen);
+    CloseWindow(fw);
+    CloseScreen(fs);
+    am_drawn = 0;
+    am_rect();
+    draw_all();
+    tick_start();
+}
+
 static void full_screen(void)
 {
+    if (am_on) { am_full_screen(); return; }
     struct Screen *fs;
     struct Window *fw;
     int done = 0, was_playing = playing && kind == K_VIDEO;
@@ -2241,7 +2674,7 @@ static void set_volume(int v)
 {
     volume = v < 0 ? 0 : v > 64 ? 64 : v;
     if (dto && (kind == K_SOUND || kind == K_VIDEO)) SetDTAttrs(dto, DTWIN, NULL, SDTA_Volume, (ULONG)volume, TAG_DONE);
-    draw_seek();
+    draw_seek();                            /* an ACMedia film's next sound blocks take it (ahir_Volume) */
 }
 
 /* The film has reached frame f: move the slider, and at the last frame go
@@ -2367,6 +2800,11 @@ static int main_event(struct IntuiMessage *m)
             if (kind == K_PICTURE && nitems > 1) {
                 int n = at * nitems / 1000;
                 show_item(n < nitems ? n : nitems - 1, playing);
+            } else if (kind == K_VIDEO && am_on && am_dur > 0) {
+                /* seek: ACMedia, to the time there */
+                am_seek((LONG)((long long)at * am_dur / 1000));
+                frame = (int)((long long)at * am_dur / 1000 / 40);
+                draw_seek();
             } else if (kind == K_VIDEO && dto && frames > 1) {
                 /* seek: ADTA_Frame */
                 frame = at * (frames - 1) / 1000;
@@ -2461,6 +2899,15 @@ static void app_news(void)
 
 /* ---- start ---- */
 
+/* AVDELAY's ms: 0-2000, else the machine's own */
+static LONG parse_avdelay(const char *v)
+{
+    LONG n = 0;
+    if (!v || *v < '0' || *v > '9') return -1;
+    while (*v >= '0' && *v <= '9' && n <= 2000) n = n * 10 + (*v++ - '0');
+    return n <= 2000 ? n : -1;
+}
+
 static void tooltypes(struct WBStartup *wb)
 {
     struct DiskObject *dob;
@@ -2471,6 +2918,7 @@ static void tooltypes(struct WBStartup *wb)
     if ((dob = GetDiskObject((CONST_STRPTR)wb->sm_ArgList[0].wa_Name))) {
         if ((v = FindToolType((CONST_STRPTR *)dob->do_ToolTypes, (CONST_STRPTR)"BUTTONS"))) bt_forced = parse_buttons((char *)v);
         if (FindToolType((CONST_STRPTR *)dob->do_ToolTypes, (CONST_STRPTR)"OWNSCREEN")) want_own = 1;
+        if ((v = FindToolType((CONST_STRPTR *)dob->do_ToolTypes, (CONST_STRPTR)"AVDELAY"))) av_delay = parse_avdelay((const char *)v);
         FreeDiskObject(dob);
     }
     CurrentDir(old);
@@ -2488,12 +2936,11 @@ static void tooltypes(struct WBStartup *wb)
  *   GETFILE         RESULT: the item being shown ("" when none)
  *   STATUS          RESULT: PLAYING or STOPPED, the item's number from 1,
  *                   the number of items ("PLAYING 2 5")
+ *   FULLSCREEN      the item on a screen of its own (0.2.0): replied at once,
+ *                   left with Esc, F, a click or any ARexx message
  * and QUIT FORCE, ACTIVATE, DEACTIVATE (RC 5: no icon yet), VERSION, HELP,
- * FAULT. */
-#include <arexx/apphost.h>
+ * FAULT. (arexx/apphost.h is included above, before full screen, which watches the port.) */
 
-static ah_host *rexx;
-static int rexx_quit;
 
 static int rx_exists(ah_call *c)
 {
@@ -2534,6 +2981,7 @@ static void rx_stop(ah_call *c) { (void)c; stop(); }
 static void rx_next(ah_call *c) { (void)c; command(C_NEXT); }
 static void rx_prev(ah_call *c) { (void)c; command(C_PREV); }
 static void rx_clear(ah_call *c) { (void)c; command(C_CLEAR); }
+static void rx_full(ah_call *c) { (void)c; want_full = 1; }   /* 0.2.0: replied at once; the main loop goes full screen */
 static void rx_volume(ah_call *c) { set_volume((int)ah_num(c, 0, volume)); }
 
 static void rx_getfile(ah_call *c)
@@ -2558,6 +3006,7 @@ static const ah_cmd rexx_cmds[] = {
     { "VOLUME", "LEVEL/N/A", rx_volume },
     { "GETFILE", "", rx_getfile },
     { "STATUS", "", rx_status },
+    { "FULLSCREEN", "", rx_full },   /* 0.2.0 */
     { NULL, NULL, NULL }
 };
 
@@ -2582,7 +3031,7 @@ static const ah_hooks rexx_hooks = { VERSION_TEXT, rx_quit_hook, rx_front_hook, 
 
 static int op_main(void)
 {
-    LONG args[3] = { 0, 0, 0 };
+    LONG args[4] = { 0, 0, 0, 0 };
     struct RDArgs *rda = NULL;
     int quit = 0, rc = RETURN_FAIL, i;
 
@@ -2605,10 +3054,11 @@ static int op_main(void)
         tooltypes(_WBenchMsg);
         for (i = 1; i < _WBenchMsg->sm_NumArgs; i++)
             add_lock(_WBenchMsg->sm_ArgList[i].wa_Lock, (const char *)_WBenchMsg->sm_ArgList[i].wa_Name);
-    } else if ((rda = ReadArgs((CONST_STRPTR)"FILES/M,BUTTONS/K,OWNSCREEN/S", args, NULL))) {
+    } else if ((rda = ReadArgs((CONST_STRPTR)"FILES/M,BUTTONS/K,OWNSCREEN/S,AVDELAY/K", args, NULL))) {
         if (args[0]) { char **f = (char **)args[0]; while (*f) add_path(*f++); }
         if (args[1]) bt_forced = parse_buttons((const char *)args[1]);
         if (args[2]) want_own = 1;
+        if (args[3]) av_delay = parse_avdelay((const char *)args[3]);
     }
     appport = CreateMsgPort();
     if (!open_ui()) goto out;
@@ -2626,6 +3076,7 @@ static int op_main(void)
             WaitIO((struct IORequest *)tick_req);
             tick_out = 0;
             film_tick();
+            am_tick();
             tick_start();
         }
         if (appport && (got & (1UL << appport->mp_SigBit))) app_news();
@@ -2633,6 +3084,7 @@ static int op_main(void)
             ah_handle(rexx);
             if (rexx_quit) quit = 1;
         }
+        if (want_full && !quit) { want_full = 0; command(C_FULL); }
         while (!quit && win && (m = GT_GetIMsg(win->UserPort)))
             quit = main_event(m);
         if (!win) break;
