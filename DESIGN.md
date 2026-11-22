@@ -88,8 +88,11 @@ the theme's list colour for sound.
 
 ## 6. Next
 
-1. Films: playing waits on gfopenvideo.datatype (it runs through every frame
-   at once and hangs on close; reported to the datatypes work).
+1. Films that fit the window again: animation.datatype draws nothing on the
+   screen behind (0.1.6's way) any more, so 0.1.9 plays films in the window
+   at their own size unless OPENPLAY_FILMSCREEN is 1 (AC-26, 22 November
+   2026). Find why it stopped drawing there (VP_HIDE, or how GFOpenRTG keeps
+   a screen behind), then turn it back on.
 2. The compact window for tunes from the mock-ups: title, author, songs and
    a scope.
 3. A themed slider for position and volume, dragged as well as clicked,

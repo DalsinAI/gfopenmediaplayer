@@ -72,7 +72,7 @@
 #include "op_icons.h"
 #include "op_rtg.h"
 
-#define VERSION_TEXT "GFOpenPlay 0.1.8 (17.11.2026)"
+#define VERSION_TEXT "GFOpenPlay 0.1.9 (22.11.2026)"
 static const char version[] __attribute__((used)) = "$VER: " VERSION_TEXT " MIT, Copyright (c) 2026 AmiCradle Team";
 
 struct Library *DataTypesBase, *AslBase, *IFFParseBase, *IconBase, *WorkbenchBase;
@@ -248,6 +248,7 @@ static int tick_out;
 static void film_present(void);
 static int kind, playing, frames, frame, fps, slide_ticks, hover = -1, pending_play, pending_ticks;
 static ULONG pic_w, pic_h, snd_len, snd_rate;
+static ULONG vid_w, vid_h;                  /* a film in the window: its size, to put it in the middle (0.1.9) */
 static char dt_name[48], dt_base[32], status[200], opened_in[24], win_title[PATH_LEN + 16];
 static struct DateStamp t_open;
 
@@ -1058,7 +1059,16 @@ static void tick_stop(void)
 static int film_route(struct OpenRTGBitMapInfo *wbi)
 {
     struct Library *gpu;
+    char on[4];
     int hw = 0;
+    /* 0.1.9: off unless OPENPLAY_FILMSCREEN is set. On 22 November 2026 animation.datatype drew nothing on
+     * the screen behind, on the x86 appliance and on PiMiga alike: it loaded every frame (gfopenvideo.datatype's
+     * VideoLog), but the screen's pixels never changed ("film sum" the same from frame 0 to 675), so the window
+     * showed that screen's blank grey. In the window, as MultiView plays it, the film shows. */
+    if (GetVar((CONST_STRPTR)"OPENPLAY_FILMSCREEN", (STRPTR)on, sizeof on, 0) <= 0 || on[0] != '1') {
+        dbg("film: in the window (OPENPLAY_FILMSCREEN=1 for the screen behind)");
+        return 0;
+    }
     if (!OpenRTGBase || !win) return 0;
     if (OpenRTGBase->lib_Version == 0 && OpenRTGBase->lib_Revision < OP_RTG_SCALE_REVISION) return 0;
     if (!OP_ORTG_BitMapInfo(OpenRTGBase, win->WScreen->RastPort.BitMap, wbi)) return 0;
@@ -1292,6 +1302,10 @@ static void size_dto(int bx, int by, int bw, int bh, int mode)
         SetAttrs(dto, DTA_TopHoriz, (LONG)tw > bw ? ((LONG)tw - bw) / 2 : 0,
                  DTA_TopVert, (LONG)th > bh ? ((LONG)th - bh) / 2 : 0, TAG_DONE);
     }
+    if (kind == K_VIDEO && vid_w && vid_h) {     /* a film in the window: at its own size, in the middle */
+        if ((LONG)vid_w <= w) { l += (w - (LONG)vid_w) / 2; w = (LONG)vid_w; }
+        if ((LONG)vid_h <= h) { t += (h - (LONG)vid_h) / 2; h = (LONG)vid_h; }
+    }
     if (kind == K_SOUND && snd_left && (show_scope || show_overview)) { w = 1; h = 1; }   /* the views are GFOpenPlay's own */
     SetAttrs(dto, GA_Left, l, GA_Top, t, GA_Width, w, GA_Height, h, TAG_DONE);
 }
@@ -1400,6 +1414,7 @@ static void close_media(void)
     playing = pending_play = 0;
     frames = frame = fps = 0;
     pic_w = pic_h = snd_len = snd_rate = 0;
+    vid_w = vid_h = 0;
     scaled_w = scaled_h = 0;
     snd_left = snd_right = NULL;
     snd_bits = 8;
@@ -1524,6 +1539,7 @@ static void show_item(int i, int play)
         frames = (int)n; fps = (int)f;
         GetDTAttrs(dto, ADTA_Width, (ULONG)&aw, ADTA_Height, (ULONG)&ah, TAG_DONE);
         dbg("film %lu x %lu", (unsigned long)aw, (unsigned long)ah);
+        vid_w = aw; vid_h = ah;
         open_film_screen((LONG)aw, (LONG)ah);   /* behind, to fit the window; else in the window as before */
     } else if (kind == K_SOUND) {
         ULONG len = 0, rate = 0, period = 0;
