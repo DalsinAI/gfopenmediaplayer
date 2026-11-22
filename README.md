@@ -30,8 +30,11 @@ off the datatypes and the new gfopengadtools interface and open rtg".
 ![GFOpenPlay 0.1 in the Open theme](docs/window.png)
 
 Status, 6 October 2026: 0.1, built and tested on AmiCradle with OS 3.2.3.
-Pictures, sound and tunes play. Films open, but playing them waits on a fix in
-gfopenvideo.datatype (gfopenimage).
+Pictures, sound, tunes and films play. Films play in the window at their own
+size (0.1.9): the screen behind that scaled them to fit (0.1.6) showed only
+grey, because animation.datatype stopped drawing on it (22 November 2026, on
+the x86 appliance and on PiMiga). `SetEnv OPENPLAY_FILMSCREEN 1` turns that
+way back on, for finding out why.
 
 ## Building
 

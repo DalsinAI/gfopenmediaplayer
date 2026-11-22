@@ -72,7 +72,7 @@
 #include "op_icons.h"
 #include "op_rtg.h"
 
-#define VERSION_TEXT "GFOpenPlay 0.1.8 (17.11.2026)"
+#define VERSION_TEXT "GFOpenPlay 0.1.9 (22.11.2026)"
 static const char version[] __attribute__((used)) = "$VER: " VERSION_TEXT " MIT, Copyright (c) 2026 AmiCradle Team";
 
 struct Library *DataTypesBase, *AslBase, *IFFParseBase, *IconBase, *WorkbenchBase;
@@ -1058,7 +1058,16 @@ static void tick_stop(void)
 static int film_route(struct OpenRTGBitMapInfo *wbi)
 {
     struct Library *gpu;
+    char on[4];
     int hw = 0;
+    /* 0.1.9: off unless OPENPLAY_FILMSCREEN is set. On 22 November 2026 animation.datatype drew nothing on
+     * the screen behind, on the x86 appliance and on PiMiga alike: it loaded every frame (gfopenvideo.datatype's
+     * VideoLog), but the screen's pixels never changed ("film sum" the same from frame 0 to 675), so the window
+     * showed that screen's blank grey. In the window, as MultiView plays it, the film shows. */
+    if (GetVar((CONST_STRPTR)"OPENPLAY_FILMSCREEN", (STRPTR)on, sizeof on, 0) <= 0 || on[0] != '1') {
+        dbg("film: in the window (OPENPLAY_FILMSCREEN=1 for the screen behind)");
+        return 0;
+    }
     if (!OpenRTGBase || !win) return 0;
     if (OpenRTGBase->lib_Version == 0 && OpenRTGBase->lib_Revision < OP_RTG_SCALE_REVISION) return 0;
     if (!OP_ORTG_BitMapInfo(OpenRTGBase, win->WScreen->RastPort.BitMap, wbi)) return 0;
